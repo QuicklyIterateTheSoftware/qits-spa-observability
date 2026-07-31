@@ -31,7 +31,7 @@ describe('App', () => {
     const harness = await RouterTestingHarness.create('/');
     const layout = harness.routeNativeElement as HTMLElement;
 
-    expect(layout.querySelectorAll('nav a')).toHaveLength(7);
+    expect(layout.querySelectorAll('nav a')).toHaveLength(8);
     expect(layout.querySelector('.qits-layout-content router-outlet')).not.toBeNull();
   });
 });
