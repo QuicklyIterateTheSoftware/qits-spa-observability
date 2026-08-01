@@ -33,17 +33,23 @@ written down here.
 - **`/observability/logs`** — the log tail, with search, severity chips and a follow mode. **+1**
   (`GET /telemetry/logs?source=&service=&query=&sinceMinutes=&limit=`), every 5 s while Follow is on
   and **not at all while it is off**. With no source selected it is **+0**.
-- **`/observability/metrics`** — the metric series at their latest values. **+1**
-  (`GET /telemetry/metrics?source=&service=&name=`).
+- **`/observability/metrics`** — every metric series the bucket holds, grouped by name and shown at
+  its latest value. **+1** (`GET /telemetry/metrics?source=&service=`), every 10 s. The **name box
+  costs nothing at all**: one read holds every series a bucket has — one point per series, capped at
+  500 — so it narrows what is already on the page. With no source selected it is **+0**.
 
-One of those six is a placeholder today — metrics. It is addressable, it carries the selected
-source, and it says what it will show and what it will cost — because an unbuilt route that renders
-blank chrome is indistinguishable from a screen that failed to load.
+All six are real screens. A `PendingPage` stood behind the unwritten ones so the route table was the
+whole route table from the first commit — addressable, carrying the selected source, and saying what
+each screen would show and cost, because an unbuilt route that renders blank chrome is
+indistinguishable from a screen that failed to load. `/metrics` was the last one behind it, so that
+component is gone with it.
 
 **The lenses live in the URL, not in the components.** `?source=`, `?sort=`, `?threshold=`,
-`?service=`, `?since=` and `?q=` each change what comes back, and by the house rule anything that
-costs a request is URL state — so every screen here is a link somebody can send and the back button
-means "the list I was looking at". A duration floor is applied by the service
+`?service=`, `?since=`, `?q=` and `?name=` each change what is on screen, and by the house rule
+anything that costs a request is URL state — so every screen here is a link somebody can send and
+the back button means "the list I was looking at". `?name=` is the one that costs no request and is
+in the URL anyway: it narrows rows the page already holds, and a metric table somebody meant to send
+is the one they had narrowed. A duration floor is applied by the service
 (`durationMs >= threshold`), which is why it is a query parameter rather than a filter over rows the
 browser already paid to receive; so is a window and so is a search. `limit` is the one figure that
 never comes from a URL: the service answers `400` outside `1..1000` rather than clamping, so it is a
@@ -100,6 +106,29 @@ rather than from the first span.
 answer is a fact about the buffer; on that one screen it is usually a fact about a platform that is
 not failing, and a sentence reading as a failure to load would be exactly backwards.
 
+**The restart sentence has one home.** Every screen ends its empty-state ladder with "the buffer was
+emptied N ago when qits-observability restarted", and `ui/restart.ts` writes that lead so all five
+say it identically — a reader who meets it on the trace list and again on the log tail must not have
+to work out whether the two describe the same event. The coda is each screen's own, in its own
+nouns, because what a restart costs a trace list and what it costs a tail are different losses.
+
+**Nothing is lost quietly on the metrics screen, and what can be lost there is not eviction.** A
+metric series is never evicted — the store replaces its point in place, so its footprint is already
+bounded — but a **new** series is refused once a bucket is at its cap, which is invisible in a table
+whose every row is correct and current. So `droppedMetricSeries` is stated whenever it is non-zero,
+and again whenever the bucket is sitting at the cap. And a series is keyed by its name and its
+attributes with the **reporting service left out of the identity**: two services exporting one metric
+with one attribute set into a shared bucket occupy a single row, showing whichever reported last. No
+bucket on this platform holds two services today, so that sentence usually does not draw — but when
+it does, the collision is otherwise silent and the row looks fine.
+
+**The workspace lens says what it is waiting for.** The other lens on this service is keyed on a
+repository and a workspace, it is real, and it has never had a subject: no workspace dev server
+exports OTLP, because the sender was dropped during a daemon extraction and the live launch path
+never had it. The overview names that gap, says where it is written down, and promises nothing about
+when — otherwise a reader who knows this platform runs workspaces reads the absence as a broken
+screen.
+
 ## How it stays current
 
 **It polls**, and that is a measurement rather than a preference: qits-observability has no SSE, no
@@ -140,9 +169,17 @@ today and that is not a promise. The reason it exists at all is that the old `re
 `ui/` carries `loadable`, `async`, `empty`, `format`, `ticker` and `page.css`, copied from the
 sibling SPAs rather than shared. `@qits/ui-components` carries presentational components, not
 application types, so there is nowhere to put them yet — and this feature does not edit the shared
-library. Two modules there are this application's own rather than copies: `severity`, which turns a
-log's two severity fields into a chip, and `window`, which holds the `?since=` spelling both screens
-that offer a window must agree on.
+library. Three modules there are this application's own rather than copies: `severity`, which turns a
+log's two severity fields into a chip and is used by both screens that draw one; `window`, which
+holds the `?since=` spelling both screens that offer a window must agree on; and `restart`, which
+holds the threshold and the lead sentence all five screens end their empty-state ladder with.
+
+**There is no `?since=` on the metrics screen, and that is the endpoint rather than an omission.**
+`/telemetry/metrics` takes no window, because a latest value has none to be inside. Nor is the
+endpoint's own `?name=` used: measured live, it is an exact, case-sensitive match — `name=memory`
+answered zero against a bucket holding five `jvm.memory.used` series — so a box wired to it would
+require its reader to already know the answer. The box filters in the browser instead, over a read
+that already holds everything.
 
 **There is no charting dependency, and there will not be one.** The waterfall is a nested list where
 each row carries a `left` and a `width` in percent, computed from the trace's own start and span:
@@ -164,6 +201,13 @@ them draws something plausible and wrong if it is handled carelessly:
 - **`durationMs` is integer milliseconds, so a sub-millisecond span is `0`.** The width stays an
   honest `0%` and the bar is floored in CSS, so the geometry remains a true proportion while the row
   stays visible. Its label reads `<1 ms`, which is exactly what the service's `0` means.
+
+`metrics/metric-series.ts` is the same idea again, and its cases are all numbers a reader would
+believe: a byte figure drawn as `168,296,448` rather than `161 MiB`, a cumulative counter given two
+decimal places it never claimed, an idle CPU ratio flattened from `0.002` to `0.00`, and a table
+that reorders itself under a ten-second poll because the response arrives in the store's insertion
+order. The UCUM unit stays on screen exactly as the exporter declared it — `{thread}`, `By`, `1` —
+with a gloss beside it rather than a translation over it.
 
 `errors/error-group.ts` is the same idea one screen along: a group's headline, its counts and its
 date are a pure function over the group, because each of them draws something plausible and wrong if

@@ -18,8 +18,9 @@ import { SourceStrip } from '../buffer/source-strip';
 import { TelemetryBuffer } from '../buffer/telemetry-buffer';
 import { Async } from '../ui/async';
 import { Empty } from '../ui/empty';
-import { formatCount, formatElapsed, formatStamp, plural, shortId } from '../ui/format';
+import { formatCount, formatStamp, plural, shortId } from '../ui/format';
 import { IDLE, LOADING, describeError, failed, ready, type Loadable } from '../ui/loadable';
+import { restartEmptied } from '../ui/restart';
 import { severityOf } from '../ui/severity';
 import { tickingNow } from '../ui/ticker';
 import { SINCE_PARAM, WINDOW_PRESETS, readWindow, windowLabel } from '../ui/window';
@@ -38,14 +39,6 @@ export const ERROR_LIST_POLL_INTERVAL_MS = 10_000;
 
 /** What a failed poll falls back to. The last good list stays on screen and is marked stale. */
 export const ERROR_LIST_BACKOFF_INTERVAL_MS = 30_000;
-
-/**
- * How recent a restart has to be for it to be the whole explanation of an empty screen.
- *
- * The trace list carries the same figure. Two screens, one number: the honesty pass owns making
- * §5's table true everywhere and is the right place to decide whether it wants one home for it.
- */
-export const RECENT_RESTART_MS = 5 * 60 * 1000;
 
 /** The per-service narrowing, as a query parameter. */
 export const SERVICE_PARAM = 'service';
@@ -212,15 +205,13 @@ export class ErrorsPage {
       );
     }
 
-    const store = this.buffer.storeValue();
-    if (store) {
-      const elapsed = this.now() - new Date(store.startedAt).getTime();
-      if (elapsed < RECENT_RESTART_MS) {
-        return (
-          `The buffer was emptied ${formatElapsed(elapsed)} ago when qits-observability ` +
-          'restarted. Anything from before that is gone, errors included.'
-        );
-      }
+    const restart = restartEmptied(
+      this.buffer.storeValue(),
+      this.now(),
+      'Anything from before that is gone, errors included.',
+    );
+    if (restart) {
+      return restart;
     }
     return (
       `No errors are buffered for ${label}. Nothing it has exported since this process came up ` +

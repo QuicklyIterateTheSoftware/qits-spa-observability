@@ -2,9 +2,9 @@ import type { Routes } from '@angular/router';
 import { QitsMainLayout } from '@qits/ui-components';
 import { ErrorsPage } from './errors/errors-page';
 import { LogsPage } from './logs/logs-page';
+import { MetricsPage } from './metrics/metrics-page';
 import { NotFound } from './not-found/not-found';
 import { OverviewPage } from './overview/overview-page';
-import { PendingPage, type PendingScreen } from './pending/pending-page';
 import { TracePage } from './traces/trace-page';
 import { TracesPage } from './traces/traces-page';
 
@@ -32,20 +32,11 @@ import { TracesPage } from './traces/traces-page';
  * spa-home's. Without it an unknown URL under `/observability/` rendered blank chrome, which reads
  * as a screen that failed rather than as a page that does not exist.
  *
- * The one remaining {@link PendingPage} entry is addressable, carries the selected source, and says
- * what it will show and what it will cost. Each screen's own workstream replaces its entry with the
- * real component; the last one to land deletes `PendingPage`. Traces, the waterfall, the errors
- * list and the log tail are real — only `/metrics` is still a placeholder.
+ * **Every route here is now a real screen.** A `PendingPage` stood behind the unwritten ones so
+ * that the route table was the whole route table from the first commit — addressable, carrying the
+ * selected source, and saying what each screen would show and cost rather than rendering blank
+ * chrome. `/metrics` was the last one standing behind it, so that component is gone with it.
  */
-
-/** The `/metrics` screen, until it is written. */
-const METRICS: PendingScreen = {
-  title: 'Metrics',
-  shows:
-    'a table of metric series grouped by name, each at its latest value. There is no chart: the ' +
-    'buffer keeps one point per series and replaces it in place, so there is no history to plot.',
-  reads: 'GET /observability/api/telemetry/metrics?source=&service=&name=',
-};
 
 export const routes: Routes = [
   {
@@ -57,7 +48,7 @@ export const routes: Routes = [
       { path: 'traces/:traceId', component: TracePage },
       { path: 'errors', component: ErrorsPage },
       { path: 'logs', component: LogsPage },
-      { path: 'metrics', component: PendingPage, data: { screen: METRICS } },
+      { path: 'metrics', component: MetricsPage },
       { path: '**', component: NotFound },
     ],
   },

@@ -1,0 +1,190 @@
+<header class="head">
+  <div>
+    <h1>Metrics</h1>
+    <p class="lede">
+      Every metric series one bucket holds, at the last value that arrived for it. One request,
+      however you narrow it.
+    </p>
+  </div>
+  <qits-button variant="secondary" size="sm" (pressed)="refresh()">Refresh</qits-button>
+</header>
+
+<app-source-strip />
+
+@if (!source()) {
+  <app-empty
+    message="No source is selected, so there is nothing to read. A metric read with no source answers with an empty list rather than an error, so this screen asks for nothing until you name a bucket."
+  />
+  <p class="note">
+    <a routerLink="/">Choose a source on the overview</a> — it is carried here in the URL and
+    travels with the link.
+  </p>
+} @else {
+  <section class="lenses" aria-label="How this table is narrowed">
+    <div class="lens">
+      <label class="lens-label" for="metric-name">Name</label>
+      <input
+        id="metric-name"
+        type="search"
+        class="search"
+        placeholder="Part of a metric name, e.g. memory"
+        [value]="name()"
+        (change)="onName($event)"
+      />
+      @if (name()) {
+        <qits-button variant="ghost" size="sm" (pressed)="clearName()">Clear</qits-button>
+      }
+      <span class="hint">
+        A case-insensitive substring of the metric name, applied <strong>here</strong> rather than
+        on the wire — one read holds every series this bucket has, so narrowing costs no request.
+        The endpoint's own <code>name</code> is an exact, case-sensitive match, which would make
+        this box answer nothing for <code>memory</code>.
+      </span>
+    </div>
+
+    @if (services().length > 0) {
+      <div class="lens">
+        <span class="lens-label" id="lens-service">Service</span>
+        <div class="chips" role="group" aria-labelledby="lens-service">
+          <button
+            type="button"
+            [class.on]="!service()"
+            [attr.aria-pressed]="!service()"
+            (click)="setService(null)"
+          >
+            All
+          </button>
+          @for (name of services(); track name) {
+            <button
+              type="button"
+              [class.on]="isService(name)"
+              [attr.aria-pressed]="isService(name)"
+              (click)="setService(name)"
+            >
+              {{ name }}
+            </button>
+          }
+        </div>
+        <span class="hint">
+          Drawn from the source row the band already holds, so narrowing costs no extra request.
+          This one <em>is</em> on the wire: the service is a filter the endpoint applies.
+        </span>
+      </div>
+    }
+  </section>
+
+  <p class="no-history">
+    <strong>Latest value only — the store keeps no history, so there is nothing to plot.</strong>
+    The buffer holds one point per series and replaces it in place when the next export arrives, so
+    everything below is a snapshot rather than a series. A chart here could only be drawn from what
+    this browser tab happened to observe while it was open; it would vanish on navigation, and it
+    would be the one thing on this page the service cannot confirm.
+  </p>
+
+  <p class="note">
+    There is no time window on this screen, and that is the endpoint rather than an omission — a
+    latest value has no window to be inside. A <code>COUNTER</code> is the latest cumulative total
+    with no rate applied, and only gauges and sums are kept at all: histograms and summaries are
+    dropped when an export is decoded.
+  </p>
+
+  @if (problem()) {
+    <p class="page-error" role="status">
+      The last refresh failed ({{ problem() }}). These values are the last ones that arrived, and
+      they are being retried every 30 s.
+    </p>
+  }
+
+  <app-async
+    [state]="tableState()"
+    loadingLabel="Reading the metric series"
+    errorLabel="Could not read the metrics"
+    (retry)="refresh()"
+  />
+
+  @if (tableState().kind === 'ready') {
+    @if (groups().length === 0) {
+      <app-empty [message]="emptyReason()" />
+      @if (range()) {
+        <p class="note">This source holds records from {{ range() }}.</p>
+      }
+    } @else {
+      <div class="scroll">
+        <table>
+          <caption>
+            {{
+              countLabel()
+            }}, grouped by metric name. A series is one attribute set of one metric, and it is the
+            row.
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Attributes</th>
+              <th scope="col">Service</th>
+              <th scope="col" class="num">Latest value</th>
+              <th scope="col">Stamped</th>
+            </tr>
+          </thead>
+          @for (group of groups(); track group.name) {
+            <tbody>
+              <tr class="group">
+                <th scope="rowgroup" colspan="4">
+                  <span class="metric mono">{{ group.name }}</span>
+                  <qits-badge [label]="group.kind" [tone]="kindTone(group.kind)" />
+                  @if (group.unit) {
+                    <span class="unit"
+                      >unit <code>{{ group.unit }}</code>
+                      @if (unitGloss(group.unit)) {
+                        <span class="gloss"> · {{ unitGloss(group.unit) }}</span>
+                      }
+                    </span>
+                  } @else {
+                    <span class="unit subtle">no unit declared</span>
+                  }
+                  @if (group.description) {
+                    <span class="desc">{{ group.description }}</span>
+                  }
+                </th>
+              </tr>
+              @for (series of group.series; track series.key) {
+                <tr>
+                  <td class="attrs">
+                    @if (series.attributes.length === 0) {
+                      <span class="subtle">no attributes — one series for this metric</span>
+                    } @else {
+                      <!-- `&ngsp;` rather than a newline: Angular strips template whitespace, and
+                           without it a copied attribute set reads "a=1b=2". -->
+                      @for (pair of series.attributes; track pair.key) {
+                        <span class="chip"
+                          ><span class="k">{{ pair.key }}=</span>{{ pair.value }}</span
+                        >&ngsp;
+                      }
+                    }
+                  </td>
+                  <td class="mono">{{ series.serviceName || '—' }}</td>
+                  <td class="num value">{{ series.value }}</td>
+                  <td class="stamp">{{ stamp(series.epochNanos) }}</td>
+                </tr>
+              }
+            </tbody>
+          }
+        </table>
+      </div>
+
+      @if (filtered()) {
+        <p class="note">{{ filtered() }}</p>
+      }
+      @if (capacity()) {
+        <p class="note">{{ capacity() }}</p>
+      }
+      @if (collision()) {
+        <p class="note">{{ collision() }}</p>
+      }
+      <p class="note">
+        “Stamped” is the exporter's own clock, not this service's ingest stamp — so an age that
+        stops moving is an instrument that has stopped reporting, in a row that otherwise looks as
+        current as its neighbours. It is the only sign here that a value is stale.
+      </p>
+    }
+  }
+}

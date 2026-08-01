@@ -111,6 +111,14 @@ td a {
   color: #6b7280;
 }
 
+/* An absent severity is drawn quieter than a reported one, on both screens that draw a severity
+   chip — the log tail and the trace's log rail. It is a statement about a record's metadata, not a
+   level, and must never sit in a row with the weight of one. */
+.sev.unset {
+  opacity: 0.7;
+  font-style: italic;
+}
+
 .note {
   margin: 0.75rem 0 0;
   color: #6b7280;

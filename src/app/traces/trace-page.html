@@ -245,8 +245,10 @@
           @for (log of logs(); track $index) {
             <li>
               <qits-badge
-                [label]="log.severityText || 'LOG'"
-                [tone]="severityTone(log.severityNumber)"
+                class="sev"
+                [class.unset]="severity(log).unset"
+                [label]="severity(log).label"
+                [tone]="severity(log).tone"
               />
               <span class="stamp">{{ offset(log.epochNanos) }}</span>
               <span class="log-body">{{ log.body }}</span>

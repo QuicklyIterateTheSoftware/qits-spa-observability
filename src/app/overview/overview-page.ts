@@ -8,10 +8,8 @@ import { TelemetryBuffer } from '../buffer/telemetry-buffer';
 import { Async } from '../ui/async';
 import { Empty } from '../ui/empty';
 import { formatBytes, formatCount, formatElapsed, formatInstant, formatStamp } from '../ui/format';
+import { bufferAge, restartEmptied } from '../ui/restart';
 import { tickingNow } from '../ui/ticker';
-
-/** How recent a restart has to be for "this buffer was emptied a moment ago" to be the answer. */
-export const RECENT_RESTART_MS = 5 * 60 * 1000;
 
 /**
  * The landing page: what is arriving, from whom, and what the thing holding it actually is.
@@ -68,8 +66,8 @@ export class OverviewPage {
 
   /** How long this process has been up, ticking locally. */
   protected readonly uptime = computed(() => {
-    const store = this.buffer.storeValue();
-    return store ? formatElapsed(this.now() - new Date(store.startedAt).getTime()) : '';
+    const age = bufferAge(this.buffer.storeValue(), this.now());
+    return age === null ? '' : formatElapsed(age);
   });
 
   /**
@@ -107,19 +105,59 @@ export class OverviewPage {
    */
   protected readonly emptyReason = computed(() => {
     const store = this.buffer.storeValue();
-    if (!store) {
+    const since = bufferAge(store, this.now());
+    if (!store || since === null) {
       return 'No sources have been read yet.';
     }
-    const since = this.now() - new Date(store.startedAt).getTime();
-    if (since < RECENT_RESTART_MS) {
-      return (
-        `The buffer was emptied ${formatElapsed(since)} ago when qits-observability restarted. ` +
-        'Anything from before that is gone, and whatever exports next will appear here.'
-      );
+    const restart = restartEmptied(
+      store,
+      this.now(),
+      'Anything from before that is gone, and whatever exports next will appear here.',
+    );
+    if (restart) {
+      return restart;
     }
     return (
       `Nothing has arrived in ${formatElapsed(since)} of uptime. The buffer is reachable and ` +
       'empty, which means no process is currently exporting OTLP to this service.'
+    );
+  });
+
+  /**
+   * The workspace lens's own answer, which is the honest form of a parked item.
+   *
+   * The other lens on this service is keyed on a repository and a workspace, it is real, and it has
+   * never had a subject: no workspace dev server exports OTLP, because the sender that would do it
+   * was dropped during a daemon extraction and the live launch path never had it. That is recorded
+   * in qits-observability's README and it is nobody's to fix from here.
+   *
+   * Saying so is the point. A reader who knows this platform runs workspaces will look for their
+   * telemetry, find an empty row or no row at all, and conclude that this screen is broken — and the
+   * sentence that prevents it has to name the gap, say where it is written down, and promise nothing
+   * about when. When the sender lands, these buckets fill and this page needs no change.
+   *
+   * It is silent while a workspace bucket holds anything, and silent when the whole buffer is empty:
+   * there the restart or the total silence is the explanation, and a paragraph about workspaces
+   * would be a second answer to a question that already has one.
+   */
+  protected readonly workspaceNote = computed(() => {
+    const sources = this.sources();
+    if (sources.length === 0) {
+      return '';
+    }
+    const workspaces = sources.filter((source) => source.kind === 'WORKSPACE');
+    if (workspaces.some((source) => source.spans + source.logs + source.metricSeries > 0)) {
+      return '';
+    }
+    const opening =
+      workspaces.length === 0
+        ? 'No workspace has exported telemetry, and no workspace bucket exists.'
+        : `${formatCount(workspaces.length)} workspace buckets exist and none of them holds a ` +
+          'record.';
+    return (
+      `${opening} Workspace dev servers do not send OTLP yet — the sender is a known gap, recorded ` +
+      "in qits-observability's README. When it lands, workspace telemetry appears here with no " +
+      'change to this page.'
     );
   });
 

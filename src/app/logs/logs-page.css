@@ -164,15 +164,9 @@
   box-shadow: inset 3px 0 0 #b91c1c;
 }
 
+/* How an absent severity is drawn lives in ui/page.css, because two screens draw one. */
 .sev {
   justify-self: start;
-}
-
-/* An absent severity is drawn quieter than a reported one. It is a statement about the record's
-   metadata, not a level, and must never sit in the row with the weight of a level. */
-.sev.unset {
-  opacity: 0.7;
-  font-style: italic;
 }
 
 .stamp {

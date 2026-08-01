@@ -18,14 +18,9 @@ import { Async } from '../ui/async';
 import { Empty } from '../ui/empty';
 import { formatCount, formatStamp, plural } from '../ui/format';
 import { IDLE, LOADING, failed, ready, type Loadable } from '../ui/loadable';
+import { severityOf } from '../ui/severity';
 import { tickingNow } from '../ui/ticker';
 import { EMPTY_WATERFALL, formatDuration, layOutTrace, type WaterfallRow } from './trace-layout';
-
-/** The severity number at which OTel calls a log record an error. */
-export const ERROR_SEVERITY = 17;
-
-/** The severity number at which it calls one a warning. */
-export const WARN_SEVERITY = 13;
 
 /**
  * One trace, as a waterfall.
@@ -236,13 +231,16 @@ export class TracePage {
     return Object.entries(event.attributes).map(([key, value]) => ({ key, value: String(value) }));
   }
 
-  /** A log's severity as a word and a tone — ERROR starts at 17 on the OTel scale. */
-  protected severityTone(severityNumber: number): 'danger' | 'warning' | 'neutral' {
-    if (severityNumber >= ERROR_SEVERITY) {
-      return 'danger';
-    }
-    return severityNumber >= WARN_SEVERITY ? 'warning' : 'neutral';
-  }
+  /**
+   * A log's severity chip, from the one function that draws them everywhere here.
+   *
+   * This screen used to carry its own copy of the OTel floors and its own tone ladder, and drew a
+   * record with no severity as `LOG` — an invented word for an absence, sitting in the rail with the
+   * same weight as a reported one. {@link severityOf} answers "no severity" for that case, keeps the
+   * exporter's own word where there is one, and puts the log rail and the tail in agreement about
+   * what a record said.
+   */
+  protected readonly severity = severityOf;
 
   /** Which span a log belongs to, by name, so the rail reads without cross-referencing ids. */
   protected spanName(spanId: string): string {

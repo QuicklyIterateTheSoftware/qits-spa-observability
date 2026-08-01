@@ -20,8 +20,9 @@ import { SourceStrip } from '../buffer/source-strip';
 import { TelemetryBuffer } from '../buffer/telemetry-buffer';
 import { Async } from '../ui/async';
 import { Empty } from '../ui/empty';
-import { formatCount, formatElapsed, formatStamp } from '../ui/format';
+import { formatCount, formatStamp } from '../ui/format';
 import { IDLE, LOADING, describeError, failed, ready, type Loadable } from '../ui/loadable';
+import { restartEmptied } from '../ui/restart';
 import { severityOf } from '../ui/severity';
 import { tickingNow } from '../ui/ticker';
 import { SINCE_PARAM, WINDOW_PRESETS, readWindow, windowLabel } from '../ui/window';
@@ -40,9 +41,6 @@ export const LOG_TAIL_FOLLOW_INTERVAL_MS = 5_000;
 
 /** What a failed poll falls back to. The last good tail stays on screen and is marked stale. */
 export const LOG_TAIL_BACKOFF_INTERVAL_MS = 30_000;
-
-/** How recent a restart has to be for it to be the whole explanation of an empty tail. */
-export const RECENT_RESTART_MS = 5 * 60 * 1000;
 
 /** The substring search, as a query parameter. It reaches the wire as `?query=`. */
 export const QUERY_PARAM = 'q';
@@ -264,15 +262,13 @@ export class LogsPage {
       );
     }
 
-    const store = this.buffer.storeValue();
-    if (store) {
-      const elapsed = this.now() - new Date(store.startedAt).getTime();
-      if (elapsed < RECENT_RESTART_MS) {
-        return (
-          `The buffer was emptied ${formatElapsed(elapsed)} ago when qits-observability ` +
-          'restarted. Anything logged before that is gone.'
-        );
-      }
+    const restart = restartEmptied(
+      this.buffer.storeValue(),
+      this.now(),
+      'Anything logged before that is gone.',
+    );
+    if (restart) {
+      return restart;
     }
     return (
       `No logs are buffered for ${label}. Nothing it has exported since this process came up is a ` +

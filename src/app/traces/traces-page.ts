@@ -18,8 +18,9 @@ import { SourceStrip } from '../buffer/source-strip';
 import { TelemetryBuffer } from '../buffer/telemetry-buffer';
 import { Async } from '../ui/async';
 import { Empty } from '../ui/empty';
-import { formatCount, formatElapsed, formatStamp, plural, shortId } from '../ui/format';
+import { formatCount, formatStamp, plural, shortId } from '../ui/format';
 import { LOADING, describeError, failed, ready, IDLE, type Loadable } from '../ui/loadable';
+import { restartEmptied } from '../ui/restart';
 import { tickingNow } from '../ui/ticker';
 import { formatDuration } from './trace-layout';
 
@@ -36,9 +37,6 @@ export const TRACE_LIST_POLL_INTERVAL_MS = 10_000;
 
 /** What a failed poll falls back to. The last good list stays on screen and is marked stale. */
 export const TRACE_LIST_BACKOFF_INTERVAL_MS = 30_000;
-
-/** How recent a restart has to be for it to be the whole explanation of an empty list. */
-export const RECENT_RESTART_MS = 5 * 60 * 1000;
 
 /** The lens, as a query parameter. `?sort=recent` and `?sort=duration`, and nothing else. */
 export const SORT_PARAM = 'sort';
@@ -207,15 +205,13 @@ export class TracesPage {
       );
     }
 
-    const store = this.buffer.storeValue();
-    if (store) {
-      const since = this.now() - new Date(store.startedAt).getTime();
-      if (since < RECENT_RESTART_MS) {
-        return (
-          `The buffer was emptied ${formatElapsed(since)} ago when qits-observability restarted. ` +
-          'Anything from before that is gone.'
-        );
-      }
+    const restart = restartEmptied(
+      this.buffer.storeValue(),
+      this.now(),
+      'Anything from before that is gone.',
+    );
+    if (restart) {
+      return restart;
     }
     return (
       `No traces are buffered for ${label}. Its spans may all have been evicted, or nothing it ` +

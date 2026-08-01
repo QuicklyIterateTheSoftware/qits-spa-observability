@@ -163,6 +163,13 @@
               }
             }
           </tbody>
+          @if (workspaceNote()) {
+            <tfoot>
+              <tr>
+                <td colspan="8">{{ workspaceNote() }}</td>
+              </tr>
+            </tfoot>
+          }
         </table>
       </div>
 

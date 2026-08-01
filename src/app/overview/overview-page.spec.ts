@@ -220,19 +220,59 @@ describe('OverviewPage', () => {
 
     expect(text()).toContain('WORKSPACE');
     expect(text()).toContain('nothing buffered');
+    expect(text()).toContain('1 workspace buckets exist and none of them holds a record');
   });
 
-  // `/traces` used to stand here, then `/errors`. Both are real screens now, so the claim moved
-  // again — it is about `PendingPage`, not about any particular unbuilt screen, and `/metrics` is
-  // the last route still standing behind it.
-  it('carries the selected source into the screens that are not built yet', async () => {
-    await open('/metrics?source=_service%2Fqits-ci');
+  it('says no workspace has ever exported, and names the gap rather than the symptom', async () => {
+    await open();
     flush();
     await settle();
 
-    expect(text()).toContain('This screen is not built yet.');
+    // The workspace lens is real, has never had a subject, and will fill with no change to this
+    // page. A reader who knows this platform runs workspaces will otherwise read the absence as a
+    // broken screen.
+    expect(text()).toContain(
+      'No workspace has exported telemetry, and no workspace bucket exists.',
+    );
+    expect(text()).toContain('the sender is a known gap');
+  });
+
+  it('says nothing about workspaces once one of them has exported something', async () => {
+    await open();
+    flush([source({ key: 'repo-1/wt-9', kind: 'WORKSPACE', label: 'wt-9', spans: 4 })]);
+    await settle();
+
+    expect(text()).not.toContain('the sender is a known gap');
+  });
+
+  it('says nothing about workspaces on an empty buffer, where the restart is the answer', async () => {
+    await open();
+    flush([], store({ sourceCount: 0 }));
+    await settle();
+
+    // A second explanation for a screen that already has one is noise, not honesty.
+    expect(text()).not.toContain('the sender is a known gap');
+    expect(text()).toContain('no process is currently exporting');
+  });
+
+  // This claim used to be about `PendingPage`, and it moved as each screen landed: `/traces`, then
+  // `/errors`, then `/metrics`, which was the last route standing behind it. There is no unbuilt
+  // screen left, so what is asserted now is what the placeholder was always standing in for — that
+  // the selection travels in the URL and the receiving screen reads it back.
+  it('carries the selected source into the screen a reader navigates to', async () => {
+    await open('/metrics?source=_service%2Fqits-ci');
+    flush();
+    http
+      .expectOne(
+        (request) =>
+          request.url === '/observability/api/telemetry/metrics' &&
+          request.params.get('source') === '_service/qits-ci',
+      )
+      .flush({ metrics: [] });
+    await settle();
+
     expect(text()).toContain('qits-ci');
-    http.verify(); // an unbuilt screen makes no request of its own
+    http.verify();
   });
 
   it('draws a 404 with the chrome around it rather than blank chrome', async () => {
