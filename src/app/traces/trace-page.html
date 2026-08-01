@@ -1,0 +1,264 @@
+<p class="crumbs">
+  <a routerLink="/">Overview</a>
+  <span class="sep" aria-hidden="true">/</span>
+  <a routerLink="/traces" [queryParams]="{ source: source() }">Traces</a>
+  <span class="sep" aria-hidden="true">/</span>
+  <span class="mono">{{ traceId() }}</span>
+</p>
+
+<header class="head">
+  <div>
+    <h1>{{ heading() || 'Trace' }}</h1>
+    @if (rows().length > 0) {
+      <p class="lede">
+        {{ summary() }} <span class="sep" aria-hidden="true">·</span> started {{ started() }}
+      </p>
+    }
+  </div>
+  <qits-button variant="secondary" size="sm" (pressed)="refresh()">Refresh</qits-button>
+</header>
+
+<app-source-strip />
+
+@if (!source()) {
+  <app-empty
+    message="No source is selected, so this trace cannot be read. A trace read with no source answers with an empty trace rather than an error — which looks exactly like an evicted trace — so this screen asks for nothing until you name a bucket."
+  />
+  <p class="note">
+    <a routerLink="/">Choose a source on the overview</a>, then come back through the trace list.
+  </p>
+} @else {
+  <app-async
+    [state]="detailState()"
+    loadingLabel="Reading the trace"
+    errorLabel="Could not read the trace"
+    (retry)="refresh()"
+  />
+
+  @if (isEmpty()) {
+    <app-empty [message]="missingReason()" />
+  }
+
+  @if (rows().length > 0) {
+    @if (waterfall().rootMissing) {
+      <p class="flagged">
+        <strong>The root of this trace is not buffered.</strong> No span here has an empty parent,
+        so what is drawn at the top is the earliest span that survived rather than the call that
+        began the work. The root may have been evicted, or it may belong to a service whose spans
+        are in a different source.
+      </p>
+    }
+
+    <section class="waterfall-section">
+      <h2>Waterfall</h2>
+      <p class="axis-note">
+        Bars are percentages of this trace's own window ({{ formatDuration(rowWindowMs()) }}), drawn
+        in CSS. There is no chart here and no charting dependency in this repository.
+      </p>
+
+      <ol class="waterfall" aria-label="Spans of this trace, in call order">
+        @for (row of rows(); track row.span.spanId) {
+          <li [class.chosen]="isChosen(row.span.spanId)">
+            <button
+              type="button"
+              class="span-row"
+              [attr.aria-pressed]="isChosen(row.span.spanId)"
+              (click)="choose(row.span.spanId)"
+            >
+              <span class="span-label" [style.padding-left]="indent(row.depth)">
+                <span class="name">{{ row.span.name || '(unnamed span)' }}</span>
+                <span class="service mono">{{ row.span.serviceName }}</span>
+                @if (row.isError) {
+                  <qits-badge label="error" tone="danger" />
+                }
+                @if (row.hasException) {
+                  <qits-badge label="exception" tone="warning" />
+                }
+                @if (row.logCount > 0) {
+                  <span class="logs-count">{{ formatCount(row.logCount) }} log</span>
+                }
+                @if (row.parentMissing) {
+                  <span class="muted">(parent not buffered)</span>
+                }
+              </span>
+              <span class="track">
+                <span
+                  [class]="barClass(row)"
+                  [style.left.%]="row.leftPercent"
+                  [style.width.%]="row.widthPercent"
+                ></span>
+              </span>
+              <span class="span-duration">{{ formatDuration(row.span.durationMs) }}</span>
+            </button>
+          </li>
+        }
+      </ol>
+
+      @if (orphanCount() > 0) {
+        <p class="note">
+          {{ formatCount(orphanCount()) }} of these spans name a parent that is not in this buffer,
+          so they are drawn at the top level and say so. They are
+          <strong>never re-parented</strong> — an invented parent would draw a plausible tree that
+          misstates who called whom. A client span whose server parent sits in another source's
+          bucket is the ordinary cause; eviction is the other.
+        </p>
+      }
+      <p class="note">
+        A bar of the minimum width is a span the service reported as <code>0</code> ms. Durations
+        here are integer milliseconds, so that means "under a millisecond", and the bar is floored
+        so the row stays visible while the geometry stays a true proportion.
+      </p>
+    </section>
+
+    @if (selected(); as row) {
+      <section class="detail">
+        <h2>{{ row.span.name || '(unnamed span)' }}</h2>
+        <dl class="facts">
+          <div>
+            <dt>Span</dt>
+            <dd class="mono">{{ row.span.spanId }}</dd>
+          </div>
+          <div>
+            <dt>Parent</dt>
+            <dd class="mono">
+              {{ row.span.parentSpanId || '— (this is a root)' }}
+              @if (row.parentMissing) {
+                <span class="muted">not buffered</span>
+              }
+            </dd>
+          </div>
+          <div>
+            <dt>Service</dt>
+            <dd class="mono">{{ row.span.serviceName || '—' }}</dd>
+          </div>
+          <div>
+            <dt>Kind</dt>
+            <dd>{{ row.span.kind || '—' }}</dd>
+          </div>
+          <div>
+            <dt>Duration</dt>
+            <dd>{{ formatDuration(row.span.durationMs) }}</dd>
+          </div>
+          <div>
+            <dt>Started</dt>
+            <dd>{{ stamp(row.span.startEpochNanos) }} · {{ offset(row.span.startEpochNanos) }}</dd>
+          </div>
+          <div>
+            <dt>Status</dt>
+            <dd>
+              <qits-badge
+                [label]="row.span.status || 'UNSET'"
+                [tone]="row.isError ? 'danger' : 'neutral'"
+              />
+              @if (row.span.statusMessage) {
+                <span class="status-message">{{ row.span.statusMessage }}</span>
+              }
+            </dd>
+          </div>
+          <div>
+            <dt>Scope</dt>
+            <dd class="mono">{{ row.span.scopeName || '—' }}</dd>
+          </div>
+        </dl>
+
+        <h3>Attributes</h3>
+        @if (attributes().length === 0) {
+          <app-empty
+            message="This span carries no attributes. The exporter stamped none, which is ordinary for an internal span."
+          />
+        } @else {
+          <div class="scroll">
+            <table>
+              <tbody>
+                @for (attribute of attributes(); track attribute.key) {
+                  <tr>
+                    <th scope="row" class="mono attr-key">{{ attribute.key }}</th>
+                    <td class="attr-value">{{ attribute.value }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        <h3>Events</h3>
+        @if (events().length === 0) {
+          <app-empty message="This span recorded no events, so nothing threw inside it." />
+        } @else {
+          <ul class="events">
+            @for (event of events(); track $index) {
+              <li [class.is-exception]="event.exception">
+                <p class="event-head">
+                  <strong>{{ event.name }}</strong>
+                  <span class="sep" aria-hidden="true">·</span>
+                  <span class="stamp">{{ stamp(event.epochNanos) }}</span>
+                  <span class="sep" aria-hidden="true">·</span>
+                  <span class="stamp">{{ offset(event.epochNanos) }}</span>
+                </p>
+                @if (event.exception) {
+                  <p class="exception-line">
+                    <span class="mono">{{ detail(event, 'exception.type') }}</span>
+                    @if (detail(event, 'exception.message')) {
+                      <span class="sep" aria-hidden="true">:</span>
+                      <span>{{ detail(event, 'exception.message') }}</span>
+                    }
+                  </p>
+                  @if (detail(event, 'exception.stacktrace')) {
+                    <pre class="stacktrace">{{ detail(event, 'exception.stacktrace') }}</pre>
+                  } @else {
+                    <p class="note">
+                      No stack trace was exported with this exception — the type and the message are
+                      everything the buffer holds.
+                    </p>
+                  }
+                } @else {
+                  <ul class="event-attributes">
+                    @for (pair of eventPairs(event); track pair.key) {
+                      <li>
+                        <span class="mono">{{ pair.key }}</span>
+                        <span class="sep" aria-hidden="true">=</span>
+                        <span>{{ pair.value }}</span>
+                      </li>
+                    }
+                  </ul>
+                }
+              </li>
+            }
+          </ul>
+        }
+      </section>
+    }
+
+    <section class="rail">
+      <h2>Correlated logs</h2>
+      @if (logs().length === 0) {
+        <app-empty
+          message="No log records name this trace. The correlation is the exporter's: a log carries a trace id only when it was written inside an active span."
+        />
+      } @else {
+        <p class="note">
+          In time order, which is the order they happened in — a log's place in a trace is when it
+          was written, not where its span sits in the tree. They arrived with the spans, in the same
+          answer, so this rail costs no request of its own.
+        </p>
+        <ol class="log-rail">
+          @for (log of logs(); track $index) {
+            <li>
+              <qits-badge
+                [label]="log.severityText || 'LOG'"
+                [tone]="severityTone(log.severityNumber)"
+              />
+              <span class="stamp">{{ offset(log.epochNanos) }}</span>
+              <span class="log-body">{{ log.body }}</span>
+              @if (spanName(log.spanId)) {
+                <span class="anchor">in {{ spanName(log.spanId) }}</span>
+              } @else if (log.spanId) {
+                <span class="muted">(its span is not buffered)</span>
+              }
+            </li>
+          }
+        </ol>
+      }
+    </section>
+  }
+}

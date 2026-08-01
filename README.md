@@ -15,10 +15,15 @@ written down here.
   with its row. Expanding a source costs nothing, and selecting one costs nothing — selection is a
   query parameter the next screen reads.
 - **`/observability/traces`** — the trace list, Recent or Slowest. **+1**
-  (`GET /telemetry/traces?source=&service=&sort=&limit=`).
+  (`GET /telemetry/traces?source=&service=&sort=&thresholdMs=&limit=`), every 10 s. It stays one
+  request however you narrow it: the lens, the duration floor and the service each change _that_
+  request rather than adding another, and the service chips are drawn from the source row the band
+  already holds. With no source selected it is **+0** — a read with no source answers `200` and an
+  empty list, so firing one would spend a request to say "no telemetry" about a bucket nobody chose.
 - **`/observability/traces/<traceId>`** — the waterfall, the span detail pane and the correlated
   logs. **+1** (`GET /telemetry/traces/{traceId}?source=`). It does not poll: a trace is a finished
-  thing, and a manual refresh covers late spans.
+  thing, and a manual refresh covers late spans. The spans and their correlated logs arrive in the
+  same answer, so the log rail costs nothing on top, and selecting a span costs nothing either.
 - **`/observability/errors`** — one card per trace, its error spans and its ERROR logs together.
   **+1** (`GET /telemetry/errors?source=&service=&sinceMinutes=&limit=`).
 - **`/observability/logs`** — the log tail, with search, severity chips and a follow mode. **+1**
@@ -26,9 +31,17 @@ written down here.
 - **`/observability/metrics`** — the metric series at their latest values. **+1**
   (`GET /telemetry/metrics?source=&service=&name=`).
 
-Four of those six are placeholders today. They are addressable, they carry the selected source, and
-they say what they will show and what it will cost — because an unbuilt route that renders blank
-chrome is indistinguishable from a screen that failed to load.
+Three of those six are placeholders today — errors, logs and metrics. They are addressable, they
+carry the selected source, and they say what they will show and what it will cost — because an
+unbuilt route that renders blank chrome is indistinguishable from a screen that failed to load.
+
+**The lenses live in the URL, not in the components.** `?source=`, `?sort=`, `?threshold=` and
+`?service=` each change what comes back, and by the house rule anything that costs a request is URL
+state — so every screen here is a link somebody can send and the back button means "the list I was
+looking at". A duration floor is applied by the service (`durationMs >= threshold`), which is why it
+is a query parameter rather than a filter over rows the browser already paid to receive. `limit` is
+the one figure that never comes from a URL: the service answers `400` outside `1..1000` rather than
+clamping, so it is a constant.
 
 ## What this UI has to say before it shows anything
 
@@ -88,6 +101,27 @@ each row carries a `left` and a `width` in percent, computed from the trace's ow
 metrics screen is a table because the store keeps one point per series and replaces it in place —
 there is no series to draw. No SPA on this platform has a chart library, and the one place a chart
 was ever considered, it was refused in writing.
+
+The layout itself is a pure function in `traces/trace-layout.ts`, and it is a function so that the
+three shapes a bounded buffer forces can be asserted directly rather than through the DOM — each of
+them draws something plausible and wrong if it is handled carelessly:
+
+- **A span whose parent is not buffered is drawn at the top level and says so.** It is never
+  re-parented. Eviction removes spans one at a time, and a client span whose server parent sits in
+  another source's bucket is not damage at all — either way, an invented parent would draw a
+  perfectly plausible tree that misstates who called whom.
+- **A trace with no root at all is flagged**, rather than promoting the earliest survivor into a
+  root it never was. The list answers this as `rootMissing`; the detail derives the same condition.
+- **`durationMs` is integer milliseconds, so a sub-millisecond span is `0`.** The width stays an
+  honest `0%` and the bar is floored in CSS, so the geometry remains a true proportion while the row
+  stays visible. Its label reads `<1 ms`, which is exactly what the service's `0` means.
+
+One measurement worth writing down: a nanosecond epoch is a 61-bit figure and JSON hands it to a
+double, so its low bits are gone before this code sees it — 42 ms of nanos measures back as
+42.000128 ms. Every calculation here lands in milliseconds, where 128 ns is five orders of magnitude
+below the smallest thing drawn, so it is recorded rather than defended against. It is also why the
+specs compare durations with a tolerance and build their stamps instead of typing them: a literal
+that large is rejected outright by `no-loss-of-precision`.
 
 ## Running the checks
 

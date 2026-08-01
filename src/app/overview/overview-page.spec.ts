@@ -222,8 +222,10 @@ describe('OverviewPage', () => {
     expect(text()).toContain('nothing buffered');
   });
 
+  // `/traces` used to stand here. It is a real screen now, so the claim moved to a route that is
+  // still pending — the claim is about `PendingPage`, not about any particular unbuilt screen.
   it('carries the selected source into the screens that are not built yet', async () => {
-    await open('/traces?source=_service%2Fqits-ci');
+    await open('/errors?source=_service%2Fqits-ci');
     flush();
     await settle();
 

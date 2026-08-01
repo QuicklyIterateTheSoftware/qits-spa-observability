@@ -88,10 +88,17 @@ export class ObservabilityApi {
    *
    * Grouping this in the browser instead would mean pulling up to the whole span cap over the wire
    * to draw fifty rows. `sort` is the Recent/Slowest lens, and the service coerces an unrecognised
-   * value to `duration` in silence — see {@link TraceSort}.
+   * value in silence — see {@link TraceSort}.
+   *
+   * `thresholdMs` is sent whenever it is set, including `0`: zero is the honest "everything" and is
+   * a value, not an absence. The `list()` helper below drops nulls, so an unset threshold costs no
+   * parameter at all and the service applies its own default of 0.
    */
   traces(query: TraceListQuery): Promise<TracesResponse> {
-    const params = this.list(query).set('sort', query.sort ?? 'recent');
+    let params = this.list(query).set('sort', query.sort ?? 'recent');
+    if (query.thresholdMs !== null && query.thresholdMs !== undefined) {
+      params = params.set('thresholdMs', String(query.thresholdMs));
+    }
     return firstValueFrom(this.http.get<TracesResponse>(`${this.root}/traces`, { params }));
   }
 

@@ -3,6 +3,8 @@ import { QitsMainLayout } from '@qits/ui-components';
 import { NotFound } from './not-found/not-found';
 import { OverviewPage } from './overview/overview-page';
 import { PendingPage, type PendingScreen } from './pending/pending-page';
+import { TracePage } from './traces/trace-page';
+import { TracesPage } from './traces/traces-page';
 
 /**
  * Seven routes, all of them inside the platform chrome.
@@ -28,28 +30,12 @@ import { PendingPage, type PendingScreen } from './pending/pending-page';
  * spa-home's. Without it an unknown URL under `/observability/` rendered blank chrome, which reads
  * as a screen that failed rather than as a page that does not exist.
  *
- * The five {@link PendingPage} entries are addressable, carry the selected source, and say what
- * they will show and what it will cost. Each screen's own workstream replaces its entry with the
- * real component; the last one to land deletes `PendingPage`.
+ * The remaining {@link PendingPage} entries are addressable, carry the selected source, and say
+ * what they will show and what it will cost. Each screen's own workstream replaces its entry with
+ * the real component; the last one to land deletes `PendingPage`. Traces and the waterfall are
+ * real as of this commit — {@link TracesPage} and {@link TracePage} — and `/errors`, `/logs` and
+ * `/metrics` are still placeholders belonging to other workstreams.
  */
-
-/** The `/traces` screen, until it is written. */
-const TRACES: PendingScreen = {
-  title: 'Traces',
-  shows:
-    'the buffered traces of the selected source, newest-first or slowest-first, each with its ' +
-    'root span, its services and its error count.',
-  reads: 'GET /observability/api/telemetry/traces?source=&service=&sort=&limit=',
-};
-
-/** The `/traces/:traceId` screen, until it is written. */
-const TRACE: PendingScreen = {
-  title: 'Trace',
-  shows:
-    'one trace as a waterfall — nested spans drawn as CSS percentages of the trace’s own span — ' +
-    'with a detail pane per span and the correlated logs beneath it.',
-  reads: 'GET /observability/api/telemetry/traces/{traceId}?source=',
-};
 
 /** The `/errors` screen, until it is written. */
 const ERRORS: PendingScreen = {
@@ -84,8 +70,8 @@ export const routes: Routes = [
     component: QitsMainLayout,
     children: [
       { path: '', component: OverviewPage },
-      { path: 'traces', component: PendingPage, data: { screen: TRACES } },
-      { path: 'traces/:traceId', component: PendingPage, data: { screen: TRACE } },
+      { path: 'traces', component: TracesPage },
+      { path: 'traces/:traceId', component: TracePage },
       { path: 'errors', component: PendingPage, data: { screen: ERRORS } },
       { path: 'logs', component: PendingPage, data: { screen: LOGS } },
       { path: 'metrics', component: PendingPage, data: { screen: METRICS } },

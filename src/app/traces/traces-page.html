@@ -1,0 +1,202 @@
+<header class="head">
+  <div>
+    <h1>Traces</h1>
+    <p class="lede">
+      What one source has been doing, grouped into traces on the server. One request, however you
+      narrow it.
+    </p>
+  </div>
+  <qits-button variant="secondary" size="sm" (pressed)="refresh()">Refresh</qits-button>
+</header>
+
+<app-source-strip />
+
+@if (!source()) {
+  <app-empty
+    message="No source is selected, so there is nothing to list. A trace read with no source answers with an empty list rather than an error, so this screen asks for nothing until you name a bucket."
+  />
+  <p class="note">
+    <a routerLink="/">Choose a source on the overview</a> — it is carried here in the URL and
+    travels with the link.
+  </p>
+} @else {
+  <section class="lenses" aria-label="How this list is narrowed">
+    <div class="lens">
+      <span class="lens-label" id="lens-sort">Lens</span>
+      <div class="segmented" role="group" aria-labelledby="lens-sort">
+        <button
+          type="button"
+          [class.on]="sort() === 'recent'"
+          [attr.aria-pressed]="sort() === 'recent'"
+          (click)="setSort('recent')"
+        >
+          Recent
+        </button>
+        <button
+          type="button"
+          [class.on]="sort() === 'duration'"
+          [attr.aria-pressed]="sort() === 'duration'"
+          (click)="setSort('duration')"
+        >
+          Slowest
+        </button>
+      </div>
+      <span class="hint">
+        {{
+          sort() === 'recent'
+            ? 'Newest first — what just happened.'
+            : 'Longest first — what is slow.'
+        }}
+      </span>
+    </div>
+
+    <div class="lens">
+      <label class="lens-label" for="threshold">Longer than</label>
+      <div class="segmented" role="group" aria-label="Duration floor presets">
+        @for (preset of presets; track preset) {
+          <button
+            type="button"
+            [class.on]="threshold() === preset"
+            [attr.aria-pressed]="threshold() === preset"
+            (click)="setThreshold(preset)"
+          >
+            {{ preset === 0 ? 'Any' : preset + ' ms' }}
+          </button>
+        }
+      </div>
+      <input
+        id="threshold"
+        type="number"
+        min="0"
+        step="10"
+        class="threshold"
+        [value]="threshold()"
+        (change)="onThreshold($event)"
+      />
+      <span class="hint">
+        The floor is applied by the service, not here — the filter is
+        <code>durationMs &gt;= threshold</code>, so <strong>Any</strong> is 0 and admits every
+        buffered trace.
+      </span>
+    </div>
+
+    @if (services().length > 0) {
+      <div class="lens">
+        <span class="lens-label" id="lens-service">Service</span>
+        <div class="chips" role="group" aria-labelledby="lens-service">
+          <button
+            type="button"
+            [class.on]="!service()"
+            [attr.aria-pressed]="!service()"
+            (click)="setService(null)"
+          >
+            All
+          </button>
+          @for (name of services(); track name) {
+            <button
+              type="button"
+              [class.on]="isService(name)"
+              [attr.aria-pressed]="isService(name)"
+              (click)="setService(name)"
+            >
+              {{ name }}
+            </button>
+          }
+        </div>
+        <span class="hint">
+          Drawn from the source row the band already holds, so narrowing costs no extra request.
+        </span>
+      </div>
+    }
+  </section>
+
+  @if (problem()) {
+    <p class="page-error" role="status">
+      The last refresh failed ({{ problem() }}). These rows are the last ones that arrived, and they
+      are being retried every 30 s.
+    </p>
+  }
+
+  <app-async
+    [state]="listState()"
+    loadingLabel="Reading the traces"
+    errorLabel="Could not read the traces"
+    (retry)="refresh()"
+  />
+
+  @if (listState().kind === 'ready') {
+    @if (traces().length === 0) {
+      <app-empty [message]="emptyReason()" />
+      @if (range()) {
+        <p class="note">This source holds records from {{ range() }}.</p>
+      }
+    } @else {
+      <div class="scroll">
+        <table>
+          <caption>
+            {{
+              sort() === 'recent'
+                ? 'Newest first. A trace is every span the buffer holds under one trace id.'
+                : 'Longest first. A trace is every span the buffer holds under one trace id.'
+            }}
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Root span</th>
+              <th scope="col">Service</th>
+              <th scope="col" class="num">Duration</th>
+              <th scope="col" class="num">Spans</th>
+              <th scope="col">Services</th>
+              <th scope="col">Started</th>
+              <th scope="col">Trace</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (trace of traces(); track trace.traceId) {
+              <tr [class.errored]="trace.errorSpanCount > 0">
+                <th scope="row" class="root">
+                  <a [routerLink]="['/traces', trace.traceId]" [queryParams]="{ source: source() }">
+                    {{ trace.rootName || '(unnamed span)' }}
+                  </a>
+                  @if (trace.rootMissing) {
+                    <span class="muted">(root not buffered)</span>
+                  }
+                  @if (trace.errorSpanCount > 0) {
+                    <qits-badge
+                      [label]="formatCount(trace.errorSpanCount) + ' error'"
+                      [tone]="tone(trace.errorSpanCount)"
+                    />
+                  }
+                  @if (trace.hasException) {
+                    <qits-badge label="exception" tone="warning" />
+                  }
+                </th>
+                <td class="mono">{{ trace.rootService || '—' }}</td>
+                <td class="num">{{ formatDuration(trace.durationMs) }}</td>
+                <td class="num">{{ formatCount(trace.spanCount) }}</td>
+                <td class="services">{{ trace.services.join(', ') || '—' }}</td>
+                <td class="stamp">{{ age(trace.startEpochNanos) }}</td>
+                <td class="mono">
+                  <a [routerLink]="['/traces', trace.traceId]" [queryParams]="{ source: source() }">
+                    {{ shortId(trace.traceId) }}
+                  </a>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      @if (truncation()) {
+        <p class="note">{{ truncation() }}</p>
+      }
+      <p class="note">
+        A duration of <code>&lt;1 ms</code> is the service's own <code>0</code>: durations are
+        integer milliseconds and the buffer holds no finer figure.
+        @if (sort() === 'duration') {
+          The threshold and this lens are the same axis — the lens orders, the threshold excludes.
+        }
+      </p>
+    }
+  }
+}

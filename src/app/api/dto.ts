@@ -122,11 +122,17 @@ export type Attributes = Readonly<Record<string, unknown>>;
 /**
  * One event on a span. The interesting case is an exception, which carries `exception.type`,
  * `exception.message` and `exception.stacktrace` in its attributes.
+ *
+ * `exception` is the service's own verdict on that, and it is read rather than re-derived: measured
+ * on the wire against a posted fixture, an exception event answers `"exception": true` beside its
+ * attributes. A screen that instead tested `name === 'exception'` would be quietly re-implementing
+ * a decision the service has already made and would disagree with it the first time it changed.
  */
 export interface SpanEventDto {
   readonly name: string;
   readonly epochNanos: number;
   readonly attributes: Attributes;
+  readonly exception: boolean;
 }
 
 /**
@@ -239,9 +245,14 @@ export interface TraceDetailDto {
 /**
  * The two lenses the store distinguishes.
  *
- * `recent` is "what just happened", `duration` is "what is slow". The service coerces anything it
- * does not recognise to `duration` **without complaining**, so a typo here is a silently wrong
- * screen; these are the only two strings this app ever sends.
+ * `recent` is "what just happened", `duration` is "what is slow".
+ *
+ * **An unrecognised value is coerced without complaining, and the two endpoints coerce it
+ * differently** — measured live: `traces?sort=nonsense` answers in `recent` order, `slow-spans`
+ * answers in `duration` order, and both answer `200`. So a typo is not an error anywhere; it is a
+ * screen showing the wrong list with full confidence, and which wrong list depends on the route.
+ * These two strings are the only ones this app ever sends, and the toggle that produces them is
+ * typed rather than free text for exactly that reason.
  */
 export type TraceSort = 'recent' | 'duration';
 
@@ -316,9 +327,17 @@ export interface ListQuery extends SourceQuery {
   readonly limit?: number | null;
 }
 
-/** The trace list's own lens. */
+/**
+ * The trace list's own lens, and its own floor.
+ *
+ * `thresholdMs` is on this endpoint as well as on `slow-spans` — measured, not assumed — and it
+ * carries the same semantics there: the filter is `>=`, so **0 admits everything**, which is why 0
+ * is the default rather than a number chosen to look tidy. In a buffer this short "everything" is a
+ * reasonable list, and a non-zero default would hide the fast traces that prove the exporter works.
+ */
 export interface TraceListQuery extends ListQuery {
   readonly sort?: TraceSort;
+  readonly thresholdMs?: number | null;
 }
 
 /** The log tail's substring, matched case-insensitively over the body **and** the severity text. */
@@ -337,5 +356,16 @@ export interface MetricQuery extends SourceQuery {
   readonly name?: string | null;
 }
 
-/** The list default. Two hundred rows is more than any screen here draws at once. */
+/**
+ * The list default. Two hundred rows is more than any screen here draws at once.
+ *
+ * **The service validates this rather than clamping it.** Measured: `limit=0`, `limit=-1` and
+ * `limit=1001` each answer `400 {"message":"limit must be between 1 and 1000"}`. So a limit is
+ * never taken from a URL or from a field on this UI — it is this constant, and the range is stated
+ * here so nobody later wires a control to it without knowing there is a cliff at either end.
+ */
 export const DEFAULT_LIMIT = 200;
+
+/** The range the service accepts. Outside it the answer is a `400`, not a clamp. */
+export const MIN_LIMIT = 1;
+export const MAX_LIMIT = 1000;
