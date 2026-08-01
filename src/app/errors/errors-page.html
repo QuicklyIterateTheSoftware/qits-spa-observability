@@ -1,0 +1,220 @@
+<header class="head">
+  <div>
+    <h1>Errors</h1>
+    <p class="lede">
+      Every ERROR span and every ERROR log in one bucket, grouped by the trace they belong to. One
+      request, however you narrow it.
+    </p>
+  </div>
+  <qits-button variant="secondary" size="sm" (pressed)="refresh()">Refresh</qits-button>
+</header>
+
+<app-source-strip />
+
+@if (!source()) {
+  <app-empty
+    message="No source is selected, so there is nothing to group. An error read with no source answers with an empty list rather than an error, so this screen asks for nothing until you name a bucket — and “no errors” is far too reassuring a thing to say by accident."
+  />
+  <p class="note">
+    <a routerLink="/">Choose a source on the overview</a> — it is carried here in the URL and
+    travels with the link.
+  </p>
+} @else {
+  <section class="lenses" aria-label="How this list is narrowed">
+    <div class="lens">
+      <span class="lens-label" id="lens-window">Window</span>
+      <div class="segmented" role="group" aria-labelledby="lens-window">
+        @for (minutes of windows; track $index) {
+          <button
+            type="button"
+            [class.on]="since() === minutes"
+            [attr.aria-pressed]="since() === minutes"
+            (click)="setSince(minutes)"
+          >
+            {{ windowLabel(minutes) }}
+          </button>
+        }
+      </div>
+      <span class="hint">
+        Applied by the service over its own ingest stamp, not the exporter's clock.
+        <strong>Everything buffered</strong> sends no window at all, which on a bounded store is the
+        only setting that cannot hide a record the buffer still holds.
+      </span>
+    </div>
+
+    @if (services().length > 0) {
+      <div class="lens">
+        <span class="lens-label" id="lens-service">Service</span>
+        <div class="chips" role="group" aria-labelledby="lens-service">
+          <button
+            type="button"
+            [class.on]="!service()"
+            [attr.aria-pressed]="!service()"
+            (click)="setService(null)"
+          >
+            All
+          </button>
+          @for (name of services(); track name) {
+            <button
+              type="button"
+              [class.on]="isService(name)"
+              [attr.aria-pressed]="isService(name)"
+              (click)="setService(name)"
+            >
+              {{ name }}
+            </button>
+          }
+        </div>
+        <span class="hint">
+          Drawn from the source row the band already holds, so narrowing costs no extra request.
+        </span>
+      </div>
+    }
+  </section>
+
+  @if (problem()) {
+    <p class="page-error" role="status">
+      The last refresh failed ({{ problem() }}). These groups are the last ones that arrived, and
+      they are being retried every 30 s.
+    </p>
+  }
+
+  <app-async
+    [state]="listState()"
+    loadingLabel="Reading the errors"
+    errorLabel="Could not read the errors"
+    (retry)="refresh()"
+  />
+
+  @if (listState().kind === 'ready') {
+    @if (groups().length === 0) {
+      <app-empty [message]="emptyReason()" />
+      @if (range() && since() === null) {
+        <p class="note">This source holds records from {{ range() }}.</p>
+      }
+    } @else {
+      <ol class="groups">
+        @for (view of groups(); track keyOf(view.traceId, view.serviceName)) {
+          <li class="group" [class.uncorrelated]="view.uncorrelated">
+            <div class="group-head">
+              <button
+                type="button"
+                class="disclosure"
+                [attr.aria-expanded]="isOpen(keyOf(view.traceId, view.serviceName))"
+                (click)="toggle(keyOf(view.traceId, view.serviceName))"
+              >
+                <span class="chevron" aria-hidden="true"></span>
+                <span class="headline">
+                  @if (view.headlineKind === 'none') {
+                    <em>No message on any of this group's evidence.</em>
+                  } @else {
+                    {{ view.headline }}
+                  }
+                </span>
+              </button>
+
+              <p class="group-meta">
+                <span class="svc">{{ view.serviceName || '—' }}</span>
+                <span class="sep" aria-hidden="true">·</span>
+                <span>{{ evidence(view.spanCount, view.logCount) }}</span>
+                @if (latest(view.latestEpochMillis)) {
+                  <span class="sep" aria-hidden="true">·</span>
+                  <span class="stamp">{{ latest(view.latestEpochMillis) }}</span>
+                }
+                <span class="sep" aria-hidden="true">·</span>
+                @if (view.uncorrelated) {
+                  <span class="no-trace">Not correlated to a trace</span>
+                } @else {
+                  <a
+                    class="mono"
+                    [routerLink]="['/traces', view.traceId]"
+                    [queryParams]="{ source: source() }"
+                  >
+                    {{ shortId(view.traceId) }}
+                  </a>
+                }
+                @if (view.headlineKind === 'log') {
+                  <span class="sep" aria-hidden="true">·</span>
+                  <span class="from">headline from a log, not an exception</span>
+                }
+                @if (view.exceptionType) {
+                  <qits-badge label="exception" tone="warning" />
+                }
+              </p>
+
+              @if (view.uncorrelated) {
+                <p class="note">
+                  Evidence the service could not correlate to a trace groups under an empty trace
+                  id. It is not a trace and there is nothing to link to — a log written outside an
+                  active span carries no trace id to correlate on.
+                </p>
+              }
+            </div>
+
+            @if (isOpen(keyOf(view.traceId, view.serviceName))) {
+              <div class="members">
+                @if (view.spanCount > 0) {
+                  <h2>Error spans</h2>
+                  <ul class="member-list">
+                    @for (span of view.group.errorSpans; track $index) {
+                      <li>
+                        <p class="member-line">
+                          <span class="name">{{ span.name || '(unnamed span)' }}</span>
+                          <qits-badge [label]="span.kind || 'UNSPECIFIED'" tone="neutral" />
+                          <span class="sep" aria-hidden="true">·</span>
+                          <span class="svc">{{ span.serviceName }}</span>
+                          <span class="sep" aria-hidden="true">·</span>
+                          <span class="num">{{ formatDuration(span.durationMs) }}</span>
+                          <span class="sep" aria-hidden="true">·</span>
+                          <span class="stamp">{{ stamp(span.startEpochNanos) }}</span>
+                        </p>
+                        @if (span.statusMessage) {
+                          <p class="status">{{ span.statusMessage }}</p>
+                        }
+                        @if (exceptionOf(span)) {
+                          <p class="exception">{{ exceptionOf(span) }}</p>
+                        }
+                        @if (stacktraceOf(span)) {
+                          <pre class="stack">{{ stacktraceOf(span) }}</pre>
+                        }
+                      </li>
+                    }
+                  </ul>
+                }
+
+                @if (view.logCount > 0) {
+                  <h2>Error logs</h2>
+                  <ul class="member-list">
+                    @for (log of view.group.errorLogs; track $index) {
+                      <li>
+                        <p class="member-line">
+                          <qits-badge
+                            [label]="severity(log).label"
+                            [tone]="severity(log).tone"
+                            [class.unset]="severity(log).unset"
+                          />
+                          <span class="stamp">{{ stamp(log.epochNanos) }}</span>
+                          <span class="svc">{{ log.serviceName }}</span>
+                        </p>
+                        <p class="body">{{ log.body }}</p>
+                      </li>
+                    }
+                  </ul>
+                }
+              </div>
+            }
+          </li>
+        }
+      </ol>
+
+      @if (truncation()) {
+        <p class="note">{{ truncation() }}</p>
+      }
+      <p class="note">
+        Expanding a group costs nothing: its spans and its logs arrived inside it. This is the same
+        grouping the <code>telemetryErrors</code> MCP tool answers with, in the same order, so an
+        agent and a person debugging one failure are reading one list.
+      </p>
+    }
+  }
+}

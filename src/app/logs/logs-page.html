@@ -1,0 +1,183 @@
+<header class="head">
+  <div>
+    <h1>Logs</h1>
+    <p class="lede">
+      The buffered log records of one bucket, oldest at the top and newest at the bottom. One
+      request, however you narrow it.
+    </p>
+  </div>
+  <qits-button variant="secondary" size="sm" (pressed)="refresh()">Refresh</qits-button>
+</header>
+
+<app-source-strip />
+
+@if (!source()) {
+  <app-empty
+    message="No source is selected, so there is nothing to tail. A log read with no source answers with an empty list rather than an error, so this screen asks for nothing until you name a bucket."
+  />
+  <p class="note">
+    <a routerLink="/">Choose a source on the overview</a> — it is carried here in the URL and
+    travels with the link.
+  </p>
+} @else {
+  <section class="lenses" aria-label="How this tail is narrowed">
+    <div class="lens">
+      <label class="lens-label" for="log-search">Search</label>
+      <input
+        id="log-search"
+        type="search"
+        class="search"
+        placeholder="Matches the body and the severity text"
+        [value]="search()"
+        (change)="onSearch($event)"
+      />
+      @if (search()) {
+        <qits-button variant="ghost" size="sm" (pressed)="clearSearch()">Clear</qits-button>
+      }
+      <span class="hint">
+        A case-insensitive substring, applied by the service over each record's body
+        <strong>and</strong> its severity text — so searching <code>error</code> also finds every
+        ERROR record whose body never says the word. Applied on Enter or on leaving the field, so
+        typing costs no requests.
+      </span>
+    </div>
+
+    <div class="lens">
+      <span class="lens-label" id="lens-window">Window</span>
+      <div class="segmented" role="group" aria-labelledby="lens-window">
+        @for (minutes of windows; track $index) {
+          <button
+            type="button"
+            [class.on]="since() === minutes"
+            [attr.aria-pressed]="since() === minutes"
+            (click)="setSince(minutes)"
+          >
+            {{ windowLabel(minutes) }}
+          </button>
+        }
+      </div>
+      <span class="hint">
+        Applied by the service over its own ingest stamp, not the exporter's clock.
+      </span>
+    </div>
+
+    @if (services().length > 0) {
+      <div class="lens">
+        <span class="lens-label" id="lens-service">Service</span>
+        <div class="chips" role="group" aria-labelledby="lens-service">
+          <button
+            type="button"
+            [class.on]="!service()"
+            [attr.aria-pressed]="!service()"
+            (click)="setService(null)"
+          >
+            All
+          </button>
+          @for (name of services(); track name) {
+            <button
+              type="button"
+              [class.on]="isService(name)"
+              [attr.aria-pressed]="isService(name)"
+              (click)="setService(name)"
+            >
+              {{ name }}
+            </button>
+          }
+        </div>
+        <span class="hint">
+          Drawn from the source row the band already holds, so narrowing costs no extra request.
+        </span>
+      </div>
+    }
+
+    <div class="lens">
+      <span class="lens-label" id="lens-follow">Follow</span>
+      <div class="segmented" role="group" aria-labelledby="lens-follow">
+        <button
+          type="button"
+          [class.on]="following()"
+          [attr.aria-pressed]="following()"
+          (click)="setFollow(true)"
+        >
+          On
+        </button>
+        <button
+          type="button"
+          [class.on]="!following()"
+          [attr.aria-pressed]="!following()"
+          (click)="setFollow(false)"
+        >
+          Off
+        </button>
+      </div>
+      <span class="hint">
+        @if (following()) {
+          Re-reading every {{ followSeconds }} s and staying at the newest record. Scrolling up
+          turns this off, because scrolling up is how you say “hold still”.
+        } @else {
+          Not reading on a timer at all. The band above still refreshes every 10 s; this tail waits
+          for Refresh, or for Follow to come back on.
+        }
+      </span>
+    </div>
+  </section>
+
+  @if (problem()) {
+    <p class="page-error" role="status">
+      The last refresh failed ({{ problem() }}). These records are the last ones that arrived, and
+      they are being retried every 30 s.
+    </p>
+  }
+
+  <app-async
+    [state]="tailState()"
+    loadingLabel="Reading the log tail"
+    errorLabel="Could not read the logs"
+    (retry)="refresh()"
+  />
+
+  @if (tailState().kind === 'ready') {
+    @if (logs().length === 0) {
+      <app-empty [message]="emptyReason()" />
+      @if (range() && since() === null) {
+        <p class="note">This source holds records from {{ range() }}.</p>
+      }
+    } @else {
+      <ol #tail class="tail" (scroll)="onScroll()" tabindex="0" aria-label="Log records">
+        @for (log of logs(); track $index) {
+          <li class="record" [class.errored]="severity(log).isError">
+            <qits-badge
+              class="sev"
+              [class.unset]="severity(log).unset"
+              [label]="severity(log).label"
+              [tone]="severity(log).tone"
+            />
+            <span class="stamp">{{ stamp(log.epochNanos) }}</span>
+            <span class="svc">{{ log.serviceName || '—' }}</span>
+            <span class="body">{{ log.body }}</span>
+            @if (log.traceId) {
+              <a
+                class="trace mono"
+                [routerLink]="['/traces', log.traceId]"
+                [queryParams]="{ source: source() }"
+                >trace</a
+              >
+            }
+          </li>
+        }
+      </ol>
+
+      @if (truncation()) {
+        <p class="note">{{ truncation() }}</p>
+      }
+      @if (unsetNote()) {
+        <p class="note">{{ unsetNote() }}</p>
+      }
+      <p class="note">
+        Newest at the bottom, which is the order the service holds them in — nothing is reversed
+        here. A row carrying a trace id links to its waterfall; a record written outside an active
+        span carries none, and shows no link rather than a dead one.
+      </p>
+    }
+  }
+}

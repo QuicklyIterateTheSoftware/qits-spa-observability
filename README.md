@@ -25,23 +25,40 @@ written down here.
   thing, and a manual refresh covers late spans. The spans and their correlated logs arrive in the
   same answer, so the log rail costs nothing on top, and selecting a span costs nothing either.
 - **`/observability/errors`** — one card per trace, its error spans and its ERROR logs together.
-  **+1** (`GET /telemetry/errors?source=&service=&sinceMinutes=&limit=`).
+  **+1** (`GET /telemetry/errors?source=&service=&sinceMinutes=&limit=`), every 10 s. It stays one
+  request however you narrow it, and **expanding a card costs nothing**: a group arrives with its
+  spans, its logs and their stack traces inside it. With no source selected it is **+0** — and on
+  this screen more than any other, because a sourceless read answers `200` with an empty list and
+  "no errors" is far too reassuring a thing to say by accident.
 - **`/observability/logs`** — the log tail, with search, severity chips and a follow mode. **+1**
-  (`GET /telemetry/logs?source=&service=&query=&sinceMinutes=&limit=`), every 5 s while Follow is on.
+  (`GET /telemetry/logs?source=&service=&query=&sinceMinutes=&limit=`), every 5 s while Follow is on
+  and **not at all while it is off**. With no source selected it is **+0**.
 - **`/observability/metrics`** — the metric series at their latest values. **+1**
   (`GET /telemetry/metrics?source=&service=&name=`).
 
-Three of those six are placeholders today — errors, logs and metrics. They are addressable, they
-carry the selected source, and they say what they will show and what it will cost — because an
-unbuilt route that renders blank chrome is indistinguishable from a screen that failed to load.
+One of those six is a placeholder today — metrics. It is addressable, it carries the selected
+source, and it says what it will show and what it will cost — because an unbuilt route that renders
+blank chrome is indistinguishable from a screen that failed to load.
 
-**The lenses live in the URL, not in the components.** `?source=`, `?sort=`, `?threshold=` and
-`?service=` each change what comes back, and by the house rule anything that costs a request is URL
-state — so every screen here is a link somebody can send and the back button means "the list I was
-looking at". A duration floor is applied by the service (`durationMs >= threshold`), which is why it
-is a query parameter rather than a filter over rows the browser already paid to receive. `limit` is
-the one figure that never comes from a URL: the service answers `400` outside `1..1000` rather than
-clamping, so it is a constant.
+**The lenses live in the URL, not in the components.** `?source=`, `?sort=`, `?threshold=`,
+`?service=`, `?since=` and `?q=` each change what comes back, and by the house rule anything that
+costs a request is URL state — so every screen here is a link somebody can send and the back button
+means "the list I was looking at". A duration floor is applied by the service
+(`durationMs >= threshold`), which is why it is a query parameter rather than a filter over rows the
+browser already paid to receive; so is a window and so is a search. `limit` is the one figure that
+never comes from a URL: the service answers `400` outside `1..1000` rather than clamping, so it is a
+constant.
+
+**`?since=` absent is not a very large window.** It means "everything still buffered", which on a
+bounded store is a _smaller_ answer than the parameter suggests and the only setting that can never
+hide a record the buffer is holding. It is the default on both screens that offer one. A window
+filters on the service's own ingest stamp, never on the exporter's clock.
+
+**Follow mode is the single exception to the URL rule, and it is a considered one.** It changes the
+_cadence_ and never the answer — every read it makes is the read the screen would have made anyway —
+and it switches itself off when the reader scrolls up, so keeping it in the URL would rewrite
+somebody's address bar and their history as they read. Everything that changes _what comes back_
+stays in the URL, so a shared link is still the list that was meant.
 
 ## What this UI has to say before it shows anything
 
@@ -65,6 +82,24 @@ a component here physically cannot say "nothing" without saying why.
 suffix (`15:40:02 · 2 m ago`), never a bare "2 m ago". This buffer holds records that may predate
 your last page load by hours.
 
+**A record with no severity is drawn as having none, never as `INFO`.** The OTLP field is optional
+and a record can arrive with `severityNumber: 0` and no text at all — measured, by posting one. The
+chip reads "no severity" and the tail says so once underneath, because a fabricated level sitting
+beside a reported one is indistinguishable from it, and this is the one screen whose whole job is to
+say exactly what a service claimed. The exporter's own word is kept where there is one: a service
+answering `WARNING` is drawn as `WARNING` and not normalised to `WARN`, since that word is also what
+the service's search matches.
+
+**A group with no trace is not a trace.** Evidence qits-observability could not correlate groups
+under an _empty_ trace id — an ERROR log written outside an active span is the ordinary case — and
+that card sits at the bottom of the errors list, says what it is, and links nowhere. It also
+arrives with no spans at all, which is why the card's headline comes from whichever evidence exists
+rather than from the first span.
+
+**An empty errors screen is good news, and it is written that way.** Everywhere else here an empty
+answer is a fact about the buffer; on that one screen it is usually a fact about a platform that is
+not failing, and a sentence reading as a failure to load would be exactly backwards.
+
 ## How it stays current
 
 **It polls**, and that is a measurement rather than a preference: qits-observability has no SSE, no
@@ -77,6 +112,18 @@ the same cadence, except the trace detail, which does not poll at all, and the l
 every 5 s while Follow is on. **All polling stops when the tab is hidden** and does one immediate
 catch-up read on return, so a backgrounded tab costs nothing. A failed poll backs off to 30 s, keeps
 the last good answer on screen and marks it stale — data you know is 40 s old beats an empty page.
+
+**The tail is the one screen that goes faster than ten seconds, and the toggle is what buys it.**
+Follow defaults on, re-reads every 5 s, and keeps the newest record in view. It switches itself off
+the moment the reader scrolls up — scrolling away from the bottom is how a person says "hold still,
+I am reading this" — and scrolling back down does _not_ switch it on again, because coming to rest
+near the bottom is not a request to be moved; the button is how it comes back. With Follow off the
+tail makes **no timed request at all**: not slower, none. Refresh is what it offers instead.
+
+The tail draws oldest at the top and newest at the bottom, which is the order the service already
+holds them in — nothing is reversed. And a limited answer keeps the **newest** records rather than
+the first, measured against the live service: a tail that kept the oldest 200 would stop updating
+while claiming to follow, and no row on screen would give that away.
 
 ## What is in `src/app/`
 
@@ -93,7 +140,9 @@ today and that is not a promise. The reason it exists at all is that the old `re
 `ui/` carries `loadable`, `async`, `empty`, `format`, `ticker` and `page.css`, copied from the
 sibling SPAs rather than shared. `@qits/ui-components` carries presentational components, not
 application types, so there is nowhere to put them yet — and this feature does not edit the shared
-library.
+library. Two modules there are this application's own rather than copies: `severity`, which turns a
+log's two severity fields into a chip, and `window`, which holds the `?since=` spelling both screens
+that offer a window must agree on.
 
 **There is no charting dependency, and there will not be one.** The waterfall is a nested list where
 each row carries a `left` and a `width` in percent, computed from the trace's own start and span:
@@ -115,6 +164,14 @@ them draws something plausible and wrong if it is handled carelessly:
 - **`durationMs` is integer milliseconds, so a sub-millisecond span is `0`.** The width stays an
   honest `0%` and the bar is floored in CSS, so the geometry remains a true proportion while the row
   stays visible. Its label reads `<1 ms`, which is exactly what the service's `0` means.
+
+`errors/error-group.ts` is the same idea one screen along: a group's headline, its counts and its
+date are a pure function over the group, because each of them draws something plausible and wrong if
+it is handled carelessly. A headline reached for from `errorSpans[0]` is blank on exactly the group
+most in need of a sentence — the uncorrelated one has no spans. A group dated by its evidence's
+_start_ files a slow failure by when it began rather than by when it failed, which puts the wrong
+row in the wrong place on a list read by recency. And an exception is an exception because the
+service said so on the event, not because the event happens to be named one.
 
 One measurement worth writing down: a nanosecond epoch is a 61-bit figure and JSON hands it to a
 double, so its low bits are gone before this code sees it — 42 ms of nanos measures back as

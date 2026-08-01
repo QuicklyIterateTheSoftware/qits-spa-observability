@@ -1,5 +1,7 @@
 import type { Routes } from '@angular/router';
 import { QitsMainLayout } from '@qits/ui-components';
+import { ErrorsPage } from './errors/errors-page';
+import { LogsPage } from './logs/logs-page';
 import { NotFound } from './not-found/not-found';
 import { OverviewPage } from './overview/overview-page';
 import { PendingPage, type PendingScreen } from './pending/pending-page';
@@ -30,30 +32,11 @@ import { TracesPage } from './traces/traces-page';
  * spa-home's. Without it an unknown URL under `/observability/` rendered blank chrome, which reads
  * as a screen that failed rather than as a page that does not exist.
  *
- * The remaining {@link PendingPage} entries are addressable, carry the selected source, and say
- * what they will show and what it will cost. Each screen's own workstream replaces its entry with
- * the real component; the last one to land deletes `PendingPage`. Traces and the waterfall are
- * real as of this commit — {@link TracesPage} and {@link TracePage} — and `/errors`, `/logs` and
- * `/metrics` are still placeholders belonging to other workstreams.
+ * The one remaining {@link PendingPage} entry is addressable, carries the selected source, and says
+ * what it will show and what it will cost. Each screen's own workstream replaces its entry with the
+ * real component; the last one to land deletes `PendingPage`. Traces, the waterfall, the errors
+ * list and the log tail are real — only `/metrics` is still a placeholder.
  */
-
-/** The `/errors` screen, until it is written. */
-const ERRORS: PendingScreen = {
-  title: 'Errors',
-  shows:
-    'one card per trace with its error spans and its ERROR logs together, each linking to the ' +
-    'waterfall.',
-  reads: 'GET /observability/api/telemetry/errors?source=&service=&sinceMinutes=&limit=',
-};
-
-/** The `/logs` screen, until it is written. */
-const LOGS: PendingScreen = {
-  title: 'Logs',
-  shows:
-    'a tail of the buffered log records with a severity chip, a substring search and a follow ' +
-    'mode that refreshes every five seconds while it is on.',
-  reads: 'GET /observability/api/telemetry/logs?source=&service=&query=&sinceMinutes=&limit=',
-};
 
 /** The `/metrics` screen, until it is written. */
 const METRICS: PendingScreen = {
@@ -72,8 +55,8 @@ export const routes: Routes = [
       { path: '', component: OverviewPage },
       { path: 'traces', component: TracesPage },
       { path: 'traces/:traceId', component: TracePage },
-      { path: 'errors', component: PendingPage, data: { screen: ERRORS } },
-      { path: 'logs', component: PendingPage, data: { screen: LOGS } },
+      { path: 'errors', component: ErrorsPage },
+      { path: 'logs', component: LogsPage },
       { path: 'metrics', component: PendingPage, data: { screen: METRICS } },
       { path: '**', component: NotFound },
     ],

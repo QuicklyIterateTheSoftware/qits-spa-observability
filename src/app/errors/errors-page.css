@@ -1,0 +1,300 @@
+/* The errors list's own furniture. The heading block, the note, the disclosure and its drawn
+   chevron come from ui/page.css, which every page in this app pulls in beside its own sheet.
+
+   The lens strip is the same shape as the trace list's, deliberately: the two screens narrow the
+   same bucket by the same axes, and a reader who learns the control once should not have to learn
+   it twice. */
+
+.lenses {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  margin: 0 0 1.1rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.375rem;
+  background: #f9fafb;
+}
+
+.lens {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+}
+
+.lens-label {
+  min-width: 6rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.hint {
+  flex: 1 1 18rem;
+  min-width: 0;
+  color: #6b7280;
+  font-size: 0.82rem;
+}
+
+.segmented {
+  display: inline-flex;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  overflow: hidden;
+  background: #fff;
+}
+
+.segmented button {
+  border: 0;
+  border-left: 1px solid #e5e7eb;
+  margin: 0;
+  padding: 0.3rem 0.7rem;
+  font: inherit;
+  font-size: 0.85rem;
+  background: #fff;
+  color: #374151;
+  cursor: pointer;
+}
+
+.segmented button:first-child {
+  border-left: 0;
+}
+
+.segmented button:hover {
+  background: #eef2ff;
+}
+
+.segmented button.on {
+  background: #4338ca;
+  color: #fff;
+}
+
+.segmented button:focus-visible,
+.chips button:focus-visible {
+  outline: 2px solid #4f46e5;
+  outline-offset: -2px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.chips button {
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  margin: 0;
+  padding: 0.2rem 0.65rem;
+  font: inherit;
+  font-size: 0.82rem;
+  background: #fff;
+  color: #374151;
+  cursor: pointer;
+}
+
+.chips button:hover {
+  background: #eef2ff;
+}
+
+.chips button.on {
+  background: #4338ca;
+  border-color: #4338ca;
+  color: #fff;
+}
+
+/* One card per trace. A list rather than a table: the interesting cell is a sentence of arbitrary
+   length, and a table would either clip it or make every other column unreadable. */
+.groups {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.group {
+  margin: 0 0 0.6rem;
+  padding: 0.6rem 0.85rem;
+  border: 1px solid #e5e7eb;
+  border-left: 3px solid #b91c1c;
+  border-radius: 0.375rem;
+  background: #fff;
+}
+
+/* The uncorrelated group is not a failing trace — it is evidence with nowhere to point. A grey rule
+   rather than a red one, so it never reads as one more thing that broke. */
+.group.uncorrelated {
+  border-left-color: #9ca3af;
+  background: #f9fafb;
+}
+
+.group-head .disclosure {
+  align-items: flex-start;
+  width: 100%;
+  text-align: left;
+  color: #111827;
+}
+
+.group-head .chevron {
+  margin-top: 0.35em;
+  flex: none;
+  color: #6b7280;
+}
+
+.headline {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.headline em {
+  color: #6b7280;
+  font-weight: 400;
+}
+
+.group-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0 0.15rem;
+  margin: 0.15rem 0 0 1.05rem;
+  color: #6b7280;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.group-meta .sep {
+  padding: 0 0.4rem;
+  color: #9ca3af;
+}
+
+.group-meta a {
+  color: #4338ca;
+}
+
+.group-meta qits-badge {
+  margin-left: 0.5rem;
+}
+
+.svc {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.92em;
+}
+
+/* "Not correlated to a trace" sits where a trace link sits on every other row, so the absence is
+   read in the same place the presence would have been. */
+.no-trace {
+  font-style: italic;
+}
+
+.from {
+  font-style: italic;
+}
+
+.group .note {
+  margin: 0.35rem 0 0 1.05rem;
+  max-width: 74ch;
+}
+
+.members {
+  margin: 0.7rem 0 0 1.05rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid #f3f4f6;
+}
+
+.members h2 {
+  margin: 0.6rem 0 0.3rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.members h2:first-child {
+  margin-top: 0;
+}
+
+.member-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.member-list > li {
+  padding: 0.35rem 0;
+}
+
+.member-list > li + li {
+  border-top: 1px solid #f3f4f6;
+}
+
+.member-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0 0.35rem;
+  margin: 0;
+  font-size: 0.88rem;
+  color: #6b7280;
+}
+
+.member-line .sep {
+  padding: 0 0.25rem;
+  color: #9ca3af;
+}
+
+.member-line .name {
+  color: #111827;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.stamp {
+  font-variant-numeric: tabular-nums;
+}
+
+.status,
+.exception,
+.body {
+  margin: 0.2rem 0 0;
+  max-width: 88ch;
+  overflow-wrap: anywhere;
+}
+
+.status {
+  color: #4b5563;
+}
+
+.exception {
+  color: #b91c1c;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.85rem;
+}
+
+.body {
+  color: #374151;
+}
+
+/* A stack trace is the one thing on this screen that is read line by line, so it keeps its own
+   line breaks and scrolls rather than wrapping. */
+.stack {
+  margin: 0.35rem 0 0;
+  padding: 0.5rem 0.65rem;
+  max-height: 18rem;
+  overflow: auto;
+  border-radius: 0.375rem;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  color: #374151;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  white-space: pre;
+}
+
+.note code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.95em;
+}

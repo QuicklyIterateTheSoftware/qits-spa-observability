@@ -222,10 +222,11 @@ describe('OverviewPage', () => {
     expect(text()).toContain('nothing buffered');
   });
 
-  // `/traces` used to stand here. It is a real screen now, so the claim moved to a route that is
-  // still pending — the claim is about `PendingPage`, not about any particular unbuilt screen.
+  // `/traces` used to stand here, then `/errors`. Both are real screens now, so the claim moved
+  // again — it is about `PendingPage`, not about any particular unbuilt screen, and `/metrics` is
+  // the last route still standing behind it.
   it('carries the selected source into the screens that are not built yet', async () => {
-    await open('/errors?source=_service%2Fqits-ci');
+    await open('/metrics?source=_service%2Fqits-ci');
     flush();
     await settle();
 
