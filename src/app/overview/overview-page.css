@@ -1,0 +1,118 @@
+/* The overview's own furniture. The heading block, the table and the chevron come from ui/page.css,
+   which every page in this app pulls in beside its own sheet. */
+
+section {
+  margin: 0 0 1.75rem;
+}
+
+h2 {
+  margin: 0 0 0.4rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+/* The ephemerality statement. Bordered so it reads as a standing fact about the product rather than
+   as a notice about this moment — a dismissible banner would be exactly the wrong shape, because
+   what it says never stops being true. */
+.what {
+  padding: 0.85rem 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.375rem;
+  background: #fff;
+}
+
+.what p {
+  margin: 0 0 0.6rem;
+  max-width: 68ch;
+}
+
+.what p:last-child {
+  margin-bottom: 0;
+}
+
+/* The buffer's numbers, as term-and-value pairs rather than a table: they are six unrelated facts
+   about one thing, not six rows of the same kind. */
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.75rem 1.25rem;
+  margin: 0 0 0.5rem;
+}
+
+.facts div {
+  min-width: 0;
+}
+
+.facts dt {
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.facts dd {
+  margin: 0.1rem 0 0;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+/* The selected row. A left rule rather than a fill, so the badges and the numbers in it keep the
+   contrast they were chosen for. */
+tr.chosen > * {
+  background: #eef2ff;
+}
+
+tr.chosen > :first-child {
+  box-shadow: inset 3px 0 0 #4338ca;
+}
+
+.range {
+  white-space: nowrap;
+  color: #6b7280;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.9em;
+}
+
+.breakdown td {
+  white-space: normal;
+  background: #f9fafb;
+}
+
+.services {
+  list-style: none;
+  margin: 0;
+  padding: 0.15rem 0 0.15rem 1.4rem;
+  font-size: 0.9em;
+  color: #4b5563;
+  font-variant-numeric: tabular-nums;
+}
+
+.services li + li {
+  margin-top: 0.15rem;
+}
+
+.sep {
+  padding: 0 0.35rem;
+  color: #9ca3af;
+}
+
+.onward {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 0.85rem;
+}
+
+.onward a {
+  color: #4338ca;
+}
+
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

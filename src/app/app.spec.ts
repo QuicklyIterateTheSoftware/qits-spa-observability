@@ -1,4 +1,6 @@
 import { TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideLocationMocks } from '@angular/common/testing';
 import { provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
@@ -8,13 +10,20 @@ import { routes } from './app.routes';
 /**
  * The shell owns one thing — the outlet — so that is what is asserted here, plus the route table
  * actually reaching the chrome behind `''`. What the layout itself renders is @qits/ui-components'
- * business; all this app is entitled to check is that it arrives, outlet and all, ready for the
- * children that are still to come.
+ * business; all this app is entitled to check is that it arrives, outlet and all.
+ *
+ * The root route is the overview now, and the overview reads the buffer on arrival — so this suite
+ * needs a backend even though what it asserts is the shell and the chrome.
  */
 describe('App', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [provideRouter(routes), provideLocationMocks()],
+      providers: [
+        provideRouter(routes),
+        provideLocationMocks(),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+      ],
     });
   });
 

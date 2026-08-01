@@ -1,0 +1,184 @@
+<header class="head">
+  <div>
+    <h1>Observability</h1>
+    <p class="lede">
+      What this platform is reporting about itself, right now, from the buffer holding it.
+    </p>
+  </div>
+  <qits-button variant="secondary" size="sm" (pressed)="buffer.load()">Refresh</qits-button>
+</header>
+
+<app-source-strip />
+
+<section class="what">
+  <h2>What this is</h2>
+  <p>
+    qits-observability receives OTLP from every service on this platform and keeps it in memory.
+    There is no database behind it, no file on disk, and no retention policy —
+    <strong>the store empties completely every time the service restarts</strong>, and a deploy of
+    qits-observability is a restart. That is the design, not a gap: this is a live buffer for
+    looking at what is happening now, and it was never meant to answer questions about last week.
+  </p>
+  <p>
+    It is also <strong>bounded</strong>. Each source holds at most {{ caps() }}; past that the
+    oldest records are evicted to make room, so what you read here is what survived rather than
+    everything that ever arrived.
+    @if (hasEvicted()) {
+      Eviction is active on this process — the band above says how much it has taken.
+    }
+  </p>
+  <p class="note">
+    Two consequences worth knowing before you read anything below. An empty screen after a restart
+    is correct and says so. And a trace id that answers with nothing may have been evicted rather
+    than never have existed — the service answers both the same way, and this UI will not guess
+    between them.
+  </p>
+</section>
+
+<section>
+  <h2>The buffer</h2>
+
+  <app-async
+    [state]="buffer.store()"
+    loadingLabel="Reading the buffer's state"
+    errorLabel="Could not read the buffer's state"
+    (retry)="buffer.load()"
+  />
+
+  @if (store(); as state) {
+    <dl class="facts">
+      <div>
+        <dt>Holding since</dt>
+        <dd>{{ formatInstant(state.startedAt) }} · {{ uptime() }}</dd>
+      </div>
+      <div>
+        <dt>Sources</dt>
+        <dd>{{ formatCount(state.sourceCount) }}</dd>
+      </div>
+      <div>
+        <dt>Held</dt>
+        <dd>{{ formatBytes(state.totalBytes) }} of {{ formatBytes(state.maxTotalBytes) }}</dd>
+      </div>
+      <div>
+        <dt>Spans evicted</dt>
+        <dd>{{ formatCount(state.evictedSpans) }}</dd>
+      </div>
+      <div>
+        <dt>Logs evicted</dt>
+        <dd>{{ formatCount(state.evictedLogs) }}</dd>
+      </div>
+      <div>
+        <dt>Metric series dropped</dt>
+        <dd>{{ formatCount(state.droppedMetricSeries) }}</dd>
+      </div>
+    </dl>
+    <p class="note">
+      The byte figures are the global ceiling. They are not what usually bites: the per-source count
+      caps fill first on this topology, so the counts above the table are the pressure to watch.
+    </p>
+  }
+</section>
+
+<section>
+  <h2>Sources</h2>
+
+  <app-async
+    [state]="buffer.sources()"
+    loadingLabel="Reading the sources"
+    errorLabel="Could not read the sources"
+    (retry)="buffer.load()"
+  />
+
+  @if (buffer.sources().kind === 'ready') {
+    @if (sources().length === 0) {
+      <app-empty [message]="emptyReason()" />
+    } @else {
+      <div class="scroll">
+        <table>
+          <caption>
+            A source is one bucket of the buffer. Selecting one carries it to every other screen.
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Source</th>
+              <th scope="col">Kind</th>
+              <th scope="col" class="num">Spans</th>
+              <th scope="col" class="num">Logs</th>
+              <th scope="col" class="num">Series</th>
+              <th scope="col" class="num">Held</th>
+              <th scope="col">Buffered range</th>
+              <th scope="col"><span class="sr">Select</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (source of sources(); track source.key) {
+              <tr [class.chosen]="isSelected(source.key)">
+                <th scope="row">
+                  <button
+                    type="button"
+                    class="disclosure"
+                    [attr.aria-expanded]="isExpanded(source.key)"
+                    (click)="toggle(source.key)"
+                  >
+                    <span class="chevron" aria-hidden="true"></span>
+                    <span>{{ source.label }}</span>
+                  </button>
+                </th>
+                <td><qits-badge [label]="source.kind" [tone]="kindTone(source.kind)" /></td>
+                <td class="num">{{ formatCount(source.spans) }}</td>
+                <td class="num">{{ formatCount(source.logs) }}</td>
+                <td class="num">{{ formatCount(source.metricSeries) }}</td>
+                <td class="num">{{ formatBytes(source.bytes) }}</td>
+                <td class="range">{{ span(source) }}</td>
+                <td>
+                  <qits-button variant="ghost" size="sm" (pressed)="select(source.key)">
+                    {{ isSelected(source.key) ? 'Selected' : 'Select' }}
+                  </qits-button>
+                </td>
+              </tr>
+              @if (isExpanded(source.key)) {
+                <tr class="breakdown">
+                  <td colspan="8">
+                    @if (source.services.length === 0) {
+                      <app-empty
+                        message="This source has no service breakdown — nothing in it carried a service name."
+                      />
+                    } @else {
+                      <ul class="services">
+                        @for (service of source.services; track service.name) {
+                          <li>
+                            <span class="mono">{{ service.name }}</span>
+                            <span class="sep" aria-hidden="true">·</span>
+                            <span>{{ formatCount(service.spans) }} spans</span>
+                            <span class="sep" aria-hidden="true">·</span>
+                            <span>{{ formatCount(service.logs) }} logs</span>
+                            <span class="sep" aria-hidden="true">·</span>
+                            <span>{{ formatCount(service.metricSeries) }} series</span>
+                          </li>
+                        }
+                      </ul>
+                    }
+                  </td>
+                </tr>
+              }
+            }
+          </tbody>
+        </table>
+      </div>
+
+      @if (selectedKey()) {
+        <nav class="onward" aria-label="Screens for the selected source">
+          <a [routerLink]="['/traces']" [queryParams]="{ source: selectedKey() }">Traces</a>
+          <a [routerLink]="['/errors']" [queryParams]="{ source: selectedKey() }">Errors</a>
+          <a [routerLink]="['/logs']" [queryParams]="{ source: selectedKey() }">Logs</a>
+          <a [routerLink]="['/metrics']" [queryParams]="{ source: selectedKey() }">Metrics</a>
+        </nav>
+      } @else {
+        <p class="note">
+          Select a source to carry it to the trace, error, log and metric screens. Those screens
+          read one bucket at a time and cannot address all of them at once.
+        </p>
+      }
+    }
+  }
+</section>
