@@ -1,1 +1,30 @@
-/* You can add global styles to this file, and also import other style files */
+/* Global styles. Component-scoped styling lives with its component; this file carries only what
+   has no component to belong to.
+
+   The stack, the size and the two colours are spa-home's, copied rather than shared: there are no
+   design tokens in @qits/ui-components yet. Without this file a page served at /observability/ falls back
+   to the browser default — Times New Roman at 16px on white — and reads as a different product
+   from the landing page and from every sibling in the navigation this app already mounts. */
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+  color: #111827;
+  background: #f9fafb;
+}
