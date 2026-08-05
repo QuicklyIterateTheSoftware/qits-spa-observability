@@ -119,6 +119,22 @@ export interface SourcesResponse {
 /** OTel attribute maps arrive as string-keyed values of whatever the exporter stamped. */
 export type Attributes = Readonly<Record<string, unknown>>;
 
+/*
+ * **`attributes` is about the record; `resourceAttributes` is about the process that sent it.**
+ * Every span, log and metric carries both, and the second is the same map on every record one
+ * process exports: `service.name`, `service.version` — the deploy's sha, or its calver —
+ * `deployment.environment.name` and `service.instance.id`.
+ *
+ * It is here to answer the one question a stack trace cannot: **which build emitted this**. This
+ * platform deploys several times a day into a buffer that holds hours, so the same log line from
+ * two builds sits in one tail looking identical, and an operator reading the older one is reading
+ * about code that is no longer running. The version is what tells them apart.
+ *
+ * An exporter that stamps none of it sends an empty map rather than a null, and every screen here
+ * draws that as nothing at all — see `ui/resource.ts` for why an absent resource is not worth a
+ * sentence where an absent attribute set is.
+ */
+
 /**
  * One event on a span. The interesting case is an exception, which carries `exception.type`,
  * `exception.message` and `exception.stacktrace` in its attributes.
@@ -160,6 +176,7 @@ export interface TelemetrySpanDto {
   readonly status: string;
   readonly statusMessage: string;
   readonly attributes: Attributes;
+  readonly resourceAttributes: Attributes;
   readonly events: readonly SpanEventDto[];
 }
 
@@ -178,6 +195,7 @@ export interface TelemetryLogDto {
   readonly spanId: string;
   readonly serviceName: string;
   readonly attributes: Attributes;
+  readonly resourceAttributes: Attributes;
 }
 
 /**
@@ -195,6 +213,7 @@ export interface TelemetryMetricDto {
   readonly epochNanos: number;
   readonly serviceName: string;
   readonly attributes: Attributes;
+  readonly resourceAttributes: Attributes;
 }
 
 /**

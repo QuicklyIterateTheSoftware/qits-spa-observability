@@ -68,6 +68,14 @@ describe('ErrorsPage', () => {
     ...over,
   });
 
+  /** What the exporting process says about itself. The build is why an operator reads it. */
+  const RESOURCE = {
+    'service.name': 'qits-fixture',
+    'service.version': '2026.802.164102',
+    'deployment.environment.name': 'production',
+    'service.instance.id': '8f2c41ae-6d18-4a90-9f0b-2ec3b7a51d44',
+  };
+
   const span = (over: Partial<TelemetrySpanDto> = {}): TelemetrySpanDto => ({
     traceId: 'bb11cc22dd33ee44ff556677889900aa',
     spanId: '2222222222222222',
@@ -81,6 +89,7 @@ describe('ErrorsPage', () => {
     status: 'ERROR',
     statusMessage: 'the blob store said no',
     attributes: {},
+    resourceAttributes: RESOURCE,
     events: [
       {
         name: 'exception',
@@ -105,6 +114,7 @@ describe('ErrorsPage', () => {
     spanId: '2222222222222222',
     serviceName: 'qits-fixture',
     attributes: {},
+    resourceAttributes: RESOURCE,
     ...over,
   });
 
@@ -341,6 +351,46 @@ describe('ErrorsPage', () => {
     expect(text()).toContain('java.lang.IllegalStateException: the blob store said no');
     // And none of that cost anything: the only outstanding request is nothing at all.
     http.verify();
+  });
+
+  it('says which build each piece of evidence came from, on the span and on the log', async () => {
+    await open(`/errors?source=${ENCODED}`);
+    shell();
+    flushGroups();
+    await settle();
+
+    const disclosure = page().querySelector('button.disclosure') as HTMLButtonElement;
+    disclosure.click();
+    await settle();
+
+    // Per member, not once per card: a rolling replace puts two builds of one service in one
+    // buffer, and "only the old build is still throwing" is exactly what a reader came for.
+    const builds = Array.from(page().querySelectorAll('.members .build')).map((node) =>
+      (node.textContent ?? '').trim(),
+    );
+    expect(builds).toEqual(['2026.802.164102', '2026.802.164102']);
+  });
+
+  it('draws no build at all where the exporter stamped no version', async () => {
+    await open(`/errors?source=${ENCODED}`);
+    shell();
+    flushGroups([
+      group({
+        errorSpans: [span({ resourceAttributes: {} })],
+        errorLogs: [log({ resourceAttributes: {} })],
+      }),
+    ]);
+    await settle();
+
+    const disclosure = page().querySelector('button.disclosure') as HTMLButtonElement;
+    disclosure.click();
+    await settle();
+
+    // The lines read exactly as they did before the field existed, rather than carrying a dash: an
+    // empty chip beside a filled one on the next row reads as a rendering fault.
+    expect(page().querySelectorAll('.members .build')).toHaveLength(0);
+    expect(text()).toContain('BlobStore.put');
+    expect(text()).toContain('blob write failed');
   });
 
   it('states a truncation with both numbers, and names the eviction behind the total', async () => {

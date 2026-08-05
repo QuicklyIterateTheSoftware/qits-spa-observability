@@ -62,6 +62,19 @@ describe('TracePage', () => {
     newestReceivedAt: new Date(Date.now() - 120_000).toISOString(),
   });
 
+  /**
+   * What the exporting process says about itself, on every record it sends.
+   *
+   * The build is the load-bearing key: a buffer that holds hours holds records from more than one
+   * deploy, and a span read without it is a span whose code the reader cannot look up.
+   */
+  const RESOURCE = {
+    'service.name': 'qits-fixture',
+    'service.version': '2026.802.164102',
+    'deployment.environment.name': 'production',
+    'service.instance.id': '8f2c41ae-6d18-4a90-9f0b-2ec3b7a51d44',
+  };
+
   const span = (over: Partial<TelemetrySpanDto> = {}): TelemetrySpanDto => ({
     traceId: TRACE_ID,
     spanId: '1111111111111111',
@@ -75,6 +88,7 @@ describe('TracePage', () => {
     status: 'UNSET',
     statusMessage: '',
     attributes: {},
+    resourceAttributes: RESOURCE,
     events: [],
     ...over,
   });
@@ -143,6 +157,7 @@ describe('TracePage', () => {
     spanId: '2222222222222222',
     serviceName: 'qits-fixture',
     attributes: {},
+    resourceAttributes: RESOURCE,
     ...over,
   });
 
@@ -399,6 +414,33 @@ describe('TracePage', () => {
 
     expect(text()).toContain('http.request.method');
     expect(text()).toContain('http.response.status_code');
+  });
+
+  it('says which build emitted the selected span, beside its own attributes', async () => {
+    await load();
+
+    // The build leads the block: which code this ran is the one thing a stack trace never says.
+    const resource = Array.from(page().querySelectorAll('.detail .attr-key')).map((node) =>
+      (node.textContent ?? '').trim(),
+    );
+    expect(resource[0]).toBe('service.version');
+    expect(text()).toContain('2026.802.164102');
+    expect(text()).toContain('production');
+    // Beside the record's own attributes rather than instead of them — two maps, both drawn.
+    expect(text()).toContain('http.request.method');
+  });
+
+  it('draws no resource block at all for a span whose exporter stamped none', async () => {
+    await load(spans().map((one) => ({ ...one, resourceAttributes: {} })));
+
+    const headings = Array.from(page().querySelectorAll('.detail h3')).map((node) =>
+      (node.textContent ?? '').trim(),
+    );
+    expect(headings).not.toContain('Resource');
+    expect(text()).not.toContain('service.version');
+    // The record's own attributes still say when they are missing — that absence is worth a
+    // sentence, and a missing resource is not: it is the same non-fact on every record sent.
+    expect(headings).toContain('Attributes');
   });
 
   it('renders the correlated logs in time order, anchored to their spans', async () => {

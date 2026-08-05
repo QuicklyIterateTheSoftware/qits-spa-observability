@@ -163,6 +163,9 @@
                           <qits-badge [label]="span.kind || 'UNSPECIFIED'" tone="neutral" />
                           <span class="sep" aria-hidden="true">·</span>
                           <span class="svc">{{ span.serviceName }}</span>
+                          @if (buildOf(span.resourceAttributes); as build) {
+                            <span class="build mono">{{ build }}</span>
+                          }
                           <span class="sep" aria-hidden="true">·</span>
                           <span class="num">{{ formatDuration(span.durationMs) }}</span>
                           <span class="sep" aria-hidden="true">·</span>
@@ -195,6 +198,9 @@
                           />
                           <span class="stamp">{{ stamp(log.epochNanos) }}</span>
                           <span class="svc">{{ log.serviceName }}</span>
+                          @if (buildOf(log.resourceAttributes); as build) {
+                            <span class="build mono">{{ build }}</span>
+                          }
                         </p>
                         <p class="body">{{ log.body }}</p>
                       </li>

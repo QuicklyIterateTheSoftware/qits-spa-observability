@@ -75,6 +75,13 @@ describe('LogsPage', () => {
     spanId: '2222222222222222',
     serviceName: 'qits-fixture',
     attributes: {},
+    /* Every record on the wire carries what its process said about itself. The tail draws none of
+       it — its rows are one line each and a build repeated down two hundred of them is noise; the
+       waterfall's detail pane and the errors screen's evidence are where it is read. */
+    resourceAttributes: {
+      'service.name': 'qits-fixture',
+      'service.version': '2026.802.164102',
+    },
     ...over,
   });
 

@@ -96,6 +96,22 @@ say exactly what a service claimed. The exporter's own word is kept where there 
 answering `WARNING` is drawn as `WARNING` and not normalised to `WARN`, since that word is also what
 the service's search matches.
 
+**Which build emitted a record is on the record.** Every span, log and metric arrives with its
+process's resource attributes beside its own — `service.name`, `service.version`,
+`deployment.environment.name` and `service.instance.id` — and the version is the deploy's sha or its
+calver. A platform that ships several times a day into a buffer that holds hours holds records from
+more than one build, and they are otherwise identical on screen. So the waterfall's span pane draws
+the whole map beside the span's own attributes, build first, and every piece of evidence on the
+errors screen carries its build beside the service that sent it — per record rather than per card,
+because a rolling replace puts two builds of one service in one buffer and "only the old one is
+still throwing" is exactly what a reader came for. The tail draws none of it: a build repeated down
+two hundred one-line rows is noise, and those rows link to the waterfall where it is read.
+
+**Where an exporter stamped no resource, nothing is drawn.** It is the one absence in this app that
+gets no sentence, and the distinction is the point: a span with no attributes is a fact about
+somebody's instrumentation, while a record with no resource is the same non-fact repeated on every
+record that exporter ever sent.
+
 **A group with no trace is not a trace.** Evidence qits-observability could not correlate groups
 under an _empty_ trace id — an ERROR log written outside an active span is the ordinary case — and
 that card sits at the bottom of the errors list, says what it is, and links nowhere. It also

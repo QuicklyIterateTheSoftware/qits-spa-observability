@@ -27,6 +27,9 @@ describe('layOutTrace', () => {
     status: 'UNSET',
     statusMessage: '',
     attributes: {},
+    /* Carried because every record on the wire carries it. The layout is geometry and reads none of
+       it — which build a span came from is the detail pane's business, not a bar's. */
+    resourceAttributes: { 'service.version': '2026.802.164102' },
     events: [],
     ...over,
   });
@@ -40,6 +43,7 @@ describe('layOutTrace', () => {
     spanId: '2222222222222222',
     serviceName: 'qits-fixture',
     attributes: {},
+    resourceAttributes: { 'service.version': '2026.802.164102' },
     ...over,
   });
 

@@ -18,6 +18,7 @@ import { Async } from '../ui/async';
 import { Empty } from '../ui/empty';
 import { formatCount, formatStamp, plural } from '../ui/format';
 import { IDLE, LOADING, failed, ready, type Loadable } from '../ui/loadable';
+import { resourcePairs, type ResourcePair } from '../ui/resource';
 import { severityOf } from '../ui/severity';
 import { tickingNow } from '../ui/ticker';
 import { EMPTY_WATERFALL, formatDuration, layOutTrace, type WaterfallRow } from './trace-layout';
@@ -179,6 +180,20 @@ export class TracePage {
     }
     return Object.entries(span.attributes).map(([key, value]) => ({ key, value: String(value) }));
   });
+
+  /**
+   * The same span's *resource* attributes — what the process said about itself, with the build
+   * first.
+   *
+   * The twin of {@link attributes}, drawn in the same table style directly beside it rather than in
+   * a panel of its own: a reader who has already chosen a span is reading secondary detail about it
+   * either way, and which build emitted it belongs with the rest of that detail. It draws nothing at
+   * all when the map is empty — see `ui/resource.ts` for why this is the one absence here that is
+   * not worth a sentence.
+   */
+  protected readonly resourceAttributes = computed<readonly ResourcePair[]>(() =>
+    resourcePairs(this.selected()?.span.resourceAttributes),
+  );
 
   protected readonly events = computed<readonly SpanEventDto[]>(
     () => this.selected()?.span.events ?? [],

@@ -161,6 +161,27 @@
           </div>
         </dl>
 
+        @if (resourceAttributes().length > 0) {
+          <h3>Resource</h3>
+          <p class="note">
+            What the process said about itself, not about this span — the same map on every record
+            it exported. <code>service.version</code> is the build this span came from, which is the
+            one thing a stack trace never says.
+          </p>
+          <div class="scroll">
+            <table>
+              <tbody>
+                @for (attribute of resourceAttributes(); track attribute.key) {
+                  <tr>
+                    <th scope="row" class="mono attr-key">{{ attribute.key }}</th>
+                    <td class="attr-value mono">{{ attribute.value }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+
         <h3>Attributes</h3>
         @if (attributes().length === 0) {
           <app-empty

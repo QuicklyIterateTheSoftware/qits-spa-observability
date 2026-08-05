@@ -20,6 +20,7 @@ import { Async } from '../ui/async';
 import { Empty } from '../ui/empty';
 import { formatCount, formatStamp, plural, shortId } from '../ui/format';
 import { IDLE, LOADING, describeError, failed, ready, type Loadable } from '../ui/loadable';
+import { buildOf } from '../ui/resource';
 import { restartEmptied } from '../ui/restart';
 import { severityOf } from '../ui/severity';
 import { tickingNow } from '../ui/ticker';
@@ -316,6 +317,17 @@ export class ErrorsPage {
   }
 
   protected severity = severityOf;
+
+  /**
+   * The build a piece of evidence came from, for the member lines under an open card.
+   *
+   * Per member rather than once per card, and that is the honest place for it: a group is one
+   * service, but a rolling replace puts two builds of that service in one buffer for as long as it
+   * takes, so a group can hold evidence from both. A single build stated over the card would be a
+   * claim about members that never made it, and the failure it hides — "this was fixed in the new
+   * build, and only the old one is still throwing" — is the exact thing a reader came for.
+   */
+  protected readonly buildOf = buildOf;
 
   /** A span's own exception message, for the member list under an open card. */
   protected exceptionOf(span: TelemetrySpanDto): string {

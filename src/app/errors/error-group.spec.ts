@@ -27,6 +27,14 @@ describe('error groups', () => {
     ...over,
   });
 
+  /** The exporting process's own map, carried by every record it sends. */
+  const RESOURCE = {
+    'service.name': 'qits-fixture',
+    'service.version': '2026.802.164102',
+    'deployment.environment.name': 'production',
+    'service.instance.id': '8f2c41ae-6d18-4a90-9f0b-2ec3b7a51d44',
+  };
+
   const span = (over: Partial<TelemetryErrorGroupDto['errorSpans'][number]> = {}) => ({
     traceId: 'bb11cc22dd33ee44ff556677889900aa',
     spanId: '2222222222222222',
@@ -40,6 +48,7 @@ describe('error groups', () => {
     status: 'ERROR',
     statusMessage: 'the blob store said no',
     attributes: {},
+    resourceAttributes: RESOURCE,
     events: [exception()],
     ...over,
   });
@@ -53,6 +62,7 @@ describe('error groups', () => {
     spanId: '2222222222222222',
     serviceName: 'qits-fixture',
     attributes: {},
+    resourceAttributes: RESOURCE,
     ...over,
   });
 

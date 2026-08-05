@@ -27,6 +27,10 @@ describe('metric-series', () => {
     epochNanos: Date.UTC(2026, 7, 1, 15, 3, 0) * 1_000_000,
     serviceName: 'qits-ci',
     attributes: { 'jvm.memory.type': 'heap', 'jvm.memory.pool.name': 'survivor space' },
+    /* A metric carries its process's resource map too. It is deliberately no part of the series
+       identity here: the store keys a series on its name and its attributes, and folding the build
+       into that spelling would split one instrument into a new row on every deploy. */
+    resourceAttributes: { 'service.name': 'qits-ci', 'service.version': '2026.802.164102' },
     ...over,
   });
 

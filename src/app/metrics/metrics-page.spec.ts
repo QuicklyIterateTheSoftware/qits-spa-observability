@@ -69,6 +69,9 @@ describe('MetricsPage', () => {
     epochNanos: nanosAt(0),
     serviceName: 'qits-ci',
     attributes: { 'jvm.memory.type': 'heap', 'jvm.memory.pool.name': 'eden space' },
+    /* Carried as the wire carries it. The table draws none of it: a series is keyed by its name and
+       its attributes, and the build has no place in that identity. */
+    resourceAttributes: { 'service.name': 'qits-ci', 'service.version': '2026.802.164102' },
     ...over,
   });
 
